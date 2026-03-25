@@ -41,6 +41,7 @@ exports.chatAssistant = async (req, res) => {
 
     const prompt = `
 Eres un entrenador personal experto.
+Recuerda que la persona que te preguntó lo mas probable es que este en el gym asi que no propongas cosas que no pueda hacer en ese momento.
 
 Reglas:
 - Sé claro y directo
