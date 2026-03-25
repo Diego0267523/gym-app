@@ -84,23 +84,30 @@ const getMeasurementsByUserId = (userId, callback) => {
 // ==========================
 
 const saveProfile = (userId, data, callback) => {
-    const sql = `
-        INSERT INTO perfil 
-        (user_id, genero, objetivo, frecuencia, nivel_actividad, tiempo_objetivo, profesion, sueno)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-    db.query(sql, [
-        userId,
-        data.genero || null,
-        data.objetivo || null,
-        data.frecuencia || null,
-        data.nivelActividad || null,
-        data.tiempoObjetivo || null,
-        data.profesion || null,
-        data.sueno || null
-    ], callback);
-};
+  const sql = `
+    INSERT INTO perfil 
+    (user_id, genero, objetivo, frecuencia, nivel_actividad, tiempo_objetivo, profesion, sueno)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `;
 
+  db.query(sql, [
+    userId,
+    data.genero || null,
+    data.objetivo || null,
+    data.frecuencia || null,
+    data.nivelActividad || null,
+    data.tiempoObjetivo || null,
+    data.profesion || null,
+    data.sueno || null
+  ], (err, result) => {
+    if (err) {
+      console.error("💥 SQL PERFIL ERROR:", err);
+    } else {
+      console.log("✅ PERFIL GUARDADO");
+    }
+    callback(err, result);
+  });
+};
 
 // ==========================
 // 🏥 SALUD

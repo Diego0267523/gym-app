@@ -17,7 +17,6 @@ exports.register = async (req, res) => {
       profesion, sueno
     } = req.body;
 
-    // ✅ VALIDACIÓN
     if (!nombre || !email || !password) {
       return res.status(400).json({
         success: false,
@@ -25,15 +24,8 @@ exports.register = async (req, res) => {
       });
     }
 
-    // 🔍 VERIFICAR SI EXISTE
     userModel.findUserByEmail(email, async (err, results) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({
-          success: false,
-          message: "Error en servidor"
-        });
-      }
+      if (err) return res.status(500).json({ success: false });
 
       if (results.length > 0) {
         return res.status(400).json({
@@ -42,39 +34,30 @@ exports.register = async (req, res) => {
         });
       }
 
-      // 🔐 HASH
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // 👤 CREAR USUARIO
       userModel.createUser(
         { nombre, email, password: hashedPassword },
         (err, result) => {
-          if (err) {
-            console.error(err);
-            return res.status(500).json({
-              success: false,
-              message: "Error al registrar usuario"
-            });
-          }
+          if (err) return res.status(500).json({ success: false });
 
           const userId = result.insertId;
 
-          // 🔥 GUARDAR TODO EN PARALELO (MEJOR PERFORMANCE)
           Promise.all([
 
             // 📏 MEDIDAS
-            new Promise((resolve) => {
+            new Promise((resolve, reject) => {
               if (!peso && !altura) return resolve();
 
               userModel.saveMeasurements(
                 userId,
                 { peso: peso || null, altura: altura || null },
-                () => resolve()
+                (err) => err ? reject(err) : resolve()
               );
             }),
 
-            // 🎯 PERFIL FITNESS
-            new Promise((resolve) => {
+            // 🎯 PERFIL (FIX 🔥)
+            new Promise((resolve, reject) => {
               userModel.saveProfile(
                 userId,
                 {
@@ -87,16 +70,17 @@ exports.register = async (req, res) => {
                   sueno
                 },
                 (err) => {
-                    if (err) {
-                        console.error("ERROR PERFIL:", err); // 👈 CLAVE
-                    }
-                    resolve();
-                    }
+                  if (err) {
+                    console.error("💥 ERROR PERFIL:", err);
+                    return reject(err);
+                  }
+                  resolve();
+                }
               );
             }),
 
             // 🏥 SALUD
-            new Promise((resolve) => {
+            new Promise((resolve, reject) => {
               userModel.saveHealth(
                 userId,
                 {
@@ -105,15 +89,23 @@ exports.register = async (req, res) => {
                   lesiones,
                   restricciones
                 },
-                () => resolve()
+                (err) => err ? reject(err) : resolve()
               );
             })
 
-          ]).then(() => {
-            return res.json({
+          ])
+          .then(() => {
+            res.json({
               success: true,
               message: "Usuario registrado correctamente 🚀",
               userId
+            });
+          })
+          .catch((error) => {
+            console.error("🔥 ERROR GENERAL:", error);
+            res.status(500).json({
+              success: false,
+              message: "Error guardando datos"
             });
           });
 
@@ -123,13 +115,9 @@ exports.register = async (req, res) => {
 
   } catch (error) {
     console.error(error);
-    return res.status(500).json({
-      success: false,
-      message: "Error interno"
-    });
+    res.status(500).json({ success: false });
   }
 };
-
 // ==========================
 // 🔥 LOGIN PRO (MEJORADO)
 // ==========================
