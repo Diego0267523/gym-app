@@ -19,6 +19,7 @@ const trainingRoutes = require("./routes/trainingRoutes");
 // 👇 DESPUÉS LOS USAS
 app.use("/api/auth", authRoutes);
 app.use("/api/training", trainingRoutes);
+
 app.use("/api/ai", aiRoutes);
 
 app.listen(PORT, () => {

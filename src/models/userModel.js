@@ -13,6 +13,27 @@ const createUser = (user, callback) => {
     db.query(sql, [user.nombre, user.email, user.password], callback);
 };
 
+const getFullProfileById = (userId, callback) => {
+    const sql = `
+        SELECT 
+            u.id,
+            u.nombre,
+            u.email,
+            p.objetivo,
+            p.nivel_actividad AS nivelActividad,
+            m.peso,
+            m.altura
+        FROM usuarios u
+        LEFT JOIN perfil p ON u.id = p.user_id
+        LEFT JOIN medidas m ON u.id = m.user_id
+        WHERE u.id = ?
+        ORDER BY m.created_at DESC
+        LIMIT 1
+    `;
+
+    db.query(sql, [userId], callback);
+};
+
 // Buscar usuario por email
 const findUserByEmail = (email, callback) => {
     const sql = `
@@ -105,10 +126,12 @@ const saveHealth = (userId, data, callback) => {
 // 🚀 EXPORTS
 // ==========================
 
+
 module.exports = {
     createUser,
     findUserByEmail,
-    findUserById, // 🔥 AÑADE ESTO
+    findUserById,
+    getFullProfileById, // 🔥 AÑADE ESTO
     saveMeasurements,
     getMeasurementsByUserId,
     saveProfile,

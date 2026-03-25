@@ -196,7 +196,7 @@ exports.getProfile = (req, res) => {
   try {
     const userId = req.user.id;
 
-    userModel.findUserById(userId, (err, results) => {
+    userModel.getFullProfileById(userId, (err, results) => {
       if (err) {
         console.error(err);
         return res.status(500).json({
@@ -212,16 +212,7 @@ exports.getProfile = (req, res) => {
         });
       }
 
-      const user = results[0];
-
-      return res.json({
-        success: true,
-        user: {
-          id: user.id,
-          nombre: user.nombre,
-          email: user.email
-        }
-      });
+      return res.json(results[0]); // 🔥 DIRECTO
     });
 
   } catch (error) {
