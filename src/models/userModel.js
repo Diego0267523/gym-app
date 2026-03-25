@@ -12,6 +12,19 @@ const findUserByEmail = (email, callback) => {
     db.query(sql, [email], callback);
 };
 
+// Guardar medidas
+const saveMeasurements = (userId, measurements, callback) => {
+    const sql = "INSERT INTO medidas (user_id, peso, altura, ) VALUES (?, ?, ?)";
+    db.query(sql, [userId, measurements.peso, measurements.altura], callback);
+};
+
+// obtener todas las medidas en ordend e un usuario
+const getMeasurementsByUserId = (userId, callback) => {
+    const sql = "SELECT * FROM medidas WHERE user_id = ? ORDER BY created_at DESC";
+    db.query(sql, [userId], callback);
+};
+
+
 // 👇 MUY IMPORTANTE
 module.exports = {
     createUser,
