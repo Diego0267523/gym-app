@@ -1,8 +1,17 @@
 const express = require("express");
 const router = express.Router();
-const { generateRoutine } = require("../controllers/aiController");
-const { chatAssistant } = require("../controllers/aiController");
 
-router.post("/routine", generateRoutine);
-router.post("/chat", chatAssistant);
+const { generateRoutine, chatAssistant } = require("../controllers/aiController");
+const verifyToken = require("../middleware/authMiddleware"); // 👈 AJUSTA SI CAMBIASTE NOMBRE
+
+// ==========================
+// 🤖 AI ROUTES (PROTEGIDAS)
+// ==========================
+
+// Generar rutina
+router.post("/routine", verifyToken, generateRoutine);
+
+// Chat con IA
+router.post("/chat", verifyToken, chatAssistant);
+
 module.exports = router;
