@@ -3,19 +3,27 @@ const jwt = require("jsonwebtoken");
 const userModel = require("../models/userModel");
 
 // ==========================
-// 🔥 REGISTER PRO
+// 🔥 REGISTER PRO (COMPLETO)
 // ==========================
 exports.register = (req, res) => {
-    const { nombre, email, password, peso, altura } = req.body;
+    const {
+        nombre, email, password,
+        peso, altura,
+        genero, objetivo, frecuencia,
+        nivelActividad, tiempoObjetivo,
+        condiciones, medicamentos,
+        lesiones, restricciones,
+        profesion, sueno
+    } = req.body;
 
     // ✅ VALIDACIÓN
     if (!nombre || !email || !password) {
         return res.status(400).json({
-            message: "Todos los campos son obligatorios"
+            message: "Todos los campos obligatorios"
         });
     }
 
-    // 🔍 VERIFICAR SI YA EXISTE
+    // 🔍 VERIFICAR USUARIO
     userModel.findUserByEmail(email, async (err, results) => {
         if (err) {
             console.log(err);
@@ -47,7 +55,9 @@ exports.register = (req, res) => {
 
                     const userId = result.insertId;
 
-                    // 🔥 GUARDAR MEDIDAS (SI EXISTEN)
+                    // ==========================
+                    // 📏 MEDIDAS
+                    // ==========================
                     if (peso || altura) {
                         userModel.saveMeasurements(
                             userId,
@@ -57,12 +67,52 @@ exports.register = (req, res) => {
                             },
                             (err) => {
                                 if (err) {
-                                    console.log("Error guardando medidas:", err);
+                                    console.log("Error medidas:", err);
                                 }
                             }
                         );
                     }
 
+                    // ==========================
+                    // 🎯 PERFIL FITNESS
+                    // ==========================
+                    userModel.saveProfile(
+                        userId,
+                        {
+                            genero,
+                            objetivo,
+                            frecuencia,
+                            nivelActividad,
+                            tiempoObjetivo,
+                            profesion,
+                            sueno
+                        },
+                        (err) => {
+                            if (err) {
+                                console.log("Error perfil:", err);
+                            }
+                        }
+                    );
+
+                    // ==========================
+                    // 🏥 SALUD
+                    // ==========================
+                    userModel.saveHealth(
+                        userId,
+                        {
+                            condiciones,
+                            medicamentos,
+                            lesiones,
+                            restricciones
+                        },
+                        (err) => {
+                            if (err) {
+                                console.log("Error salud:", err);
+                            }
+                        }
+                    );
+
+                    // ✅ RESPUESTA FINAL
                     return res.json({
                         message: "Usuario registrado correctamente ✅",
                         userId
@@ -89,7 +139,7 @@ exports.login = (req, res) => {
     // ✅ VALIDACIÓN
     if (!email || !password) {
         return res.status(400).json({
-            message: "Email y contraseña son obligatorios"
+            message: "Email y contraseña obligatorios"
         });
     }
 
@@ -125,6 +175,7 @@ exports.login = (req, res) => {
             { expiresIn: "1h" }
         );
 
+        // ✅ RESPUESTA
         return res.json({
             message: "Login exitoso ✅",
             token,
