@@ -3,187 +3,189 @@ const jwt = require("jsonwebtoken");
 const userModel = require("../models/userModel");
 
 // ==========================
-// 🔥 REGISTER PRO (COMPLETO)
+// 🔥 REGISTER PRO (MEJORADO)
 // ==========================
-exports.register = (req, res) => {
+exports.register = async (req, res) => {
+  try {
     const {
-        nombre, email, password,
-        peso, altura,
-        genero, objetivo, frecuencia,
-        nivelActividad, tiempoObjetivo,
-        condiciones, medicamentos,
-        lesiones, restricciones,
-        profesion, sueno
+      nombre, email, password,
+      peso, altura,
+      genero, objetivo, frecuencia,
+      nivelActividad, tiempoObjetivo,
+      condiciones, medicamentos,
+      lesiones, restricciones,
+      profesion, sueno
     } = req.body;
 
     // ✅ VALIDACIÓN
     if (!nombre || !email || !password) {
-        return res.status(400).json({
-            message: "Todos los campos obligatorios"
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Nombre, email y contraseña son obligatorios"
+      });
     }
 
-    // 🔍 VERIFICAR USUARIO
+    // 🔍 VERIFICAR SI EXISTE
     userModel.findUserByEmail(email, async (err, results) => {
-        if (err) {
-            console.log(err);
+      if (err) {
+        console.error(err);
+        return res.status(500).json({
+          success: false,
+          message: "Error en servidor"
+        });
+      }
+
+      if (results.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: "El usuario ya existe"
+        });
+      }
+
+      // 🔐 HASH
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // 👤 CREAR USUARIO
+      userModel.createUser(
+        { nombre, email, password: hashedPassword },
+        (err, result) => {
+          if (err) {
+            console.error(err);
             return res.status(500).json({
-                message: "Error en el servidor"
+              success: false,
+              message: "Error al registrar usuario"
             });
-        }
+          }
 
-        if (results.length > 0) {
-            return res.status(400).json({
-                message: "El usuario ya existe"
+          const userId = result.insertId;
+
+          // 🔥 GUARDAR TODO EN PARALELO (MEJOR PERFORMANCE)
+          Promise.all([
+
+            // 📏 MEDIDAS
+            new Promise((resolve) => {
+              if (!peso && !altura) return resolve();
+
+              userModel.saveMeasurements(
+                userId,
+                { peso: peso || null, altura: altura || null },
+                () => resolve()
+              );
+            }),
+
+            // 🎯 PERFIL FITNESS
+            new Promise((resolve) => {
+              userModel.saveProfile(
+                userId,
+                {
+                  genero,
+                  objetivo,
+                  frecuencia,
+                  nivelActividad,
+                  tiempoObjetivo,
+                  profesion,
+                  sueno
+                },
+                () => resolve()
+              );
+            }),
+
+            // 🏥 SALUD
+            new Promise((resolve) => {
+              userModel.saveHealth(
+                userId,
+                {
+                  condiciones,
+                  medicamentos,
+                  lesiones,
+                  restricciones
+                },
+                () => resolve()
+              );
+            })
+
+          ]).then(() => {
+            return res.json({
+              success: true,
+              message: "Usuario registrado correctamente 🚀",
+              userId
             });
+          });
+
         }
-
-        try {
-            // 🔐 HASH PASSWORD
-            const hashedPassword = await bcrypt.hash(password, 10);
-
-            // 👤 CREAR USUARIO
-            userModel.createUser(
-                { nombre, email, password: hashedPassword },
-                (err, result) => {
-                    if (err) {
-                        console.log(err);
-                        return res.status(500).json({
-                            message: "Error al registrar"
-                        });
-                    }
-
-                    const userId = result.insertId;
-
-                    // ==========================
-                    // 📏 MEDIDAS
-                    // ==========================
-                    if (peso || altura) {
-                        userModel.saveMeasurements(
-                            userId,
-                            {
-                                peso: peso || null,
-                                altura: altura || null
-                            },
-                            (err) => {
-                                if (err) {
-                                    console.log("Error medidas:", err);
-                                }
-                            }
-                        );
-                    }
-
-                    // ==========================
-                    // 🎯 PERFIL FITNESS
-                    // ==========================
-                    userModel.saveProfile(
-                        userId,
-                        {
-                            genero,
-                            objetivo,
-                            frecuencia,
-                            nivelActividad,
-                            tiempoObjetivo,
-                            profesion,
-                            sueno
-                        },
-                        (err) => {
-                            if (err) {
-                                console.log("Error perfil:", err);
-                            }
-                        }
-                    );
-
-                    // ==========================
-                    // 🏥 SALUD
-                    // ==========================
-                    userModel.saveHealth(
-                        userId,
-                        {
-                            condiciones,
-                            medicamentos,
-                            lesiones,
-                            restricciones
-                        },
-                        (err) => {
-                            if (err) {
-                                console.log("Error salud:", err);
-                            }
-                        }
-                    );
-
-                    // ✅ RESPUESTA FINAL
-                    return res.json({
-                        message: "Usuario registrado correctamente ✅",
-                        userId
-                    });
-                }
-            );
-
-        } catch (error) {
-            console.log(error);
-            return res.status(500).json({
-                message: "Error en el servidor"
-            });
-        }
+      );
     });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Error interno"
+    });
+  }
 };
 
-
 // ==========================
-// 🔥 LOGIN PRO
+// 🔥 LOGIN PRO (MEJORADO)
 // ==========================
 exports.login = (req, res) => {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
-    // ✅ VALIDACIÓN
-    if (!email || !password) {
-        return res.status(400).json({
-            message: "Email y contraseña obligatorios"
-        });
+  // ✅ VALIDACIÓN
+  if (!email || !password) {
+    return res.status(400).json({
+      success: false,
+      message: "Email y contraseña obligatorios"
+    });
+  }
+
+  userModel.findUserByEmail(email, async (err, results) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({
+        success: false,
+        message: "Error en servidor"
+      });
     }
 
-    userModel.findUserByEmail(email, async (err, results) => {
-        if (err) {
-            console.log(err);
-            return res.status(500).json({
-                message: "Error en el servidor"
-            });
-        }
+    if (results.length === 0) {
+      return res.status(401).json({
+        success: false,
+        message: "Usuario no encontrado"
+      });
+    }
 
-        if (results.length === 0) {
-            return res.status(401).json({
-                message: "Usuario no encontrado"
-            });
-        }
+    const user = results[0];
 
-        const user = results[0];
+    // 🔐 VALIDAR PASSWORD
+    const validPassword = await bcrypt.compare(password, user.password);
 
-        // 🔐 VALIDAR PASSWORD
-        const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
+      return res.status(401).json({
+        success: false,
+        message: "Contraseña incorrecta"
+      });
+    }
 
-        if (!validPassword) {
-            return res.status(401).json({
-                message: "Contraseña incorrecta"
-            });
-        }
+    // 🔥 TOKEN (MEJORADO)
+    const token = jwt.sign(
+      {
+        id: user.id,
+        email: user.email
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" } // 🔥 mejor UX
+    );
 
-        // 🔥 TOKEN
-        const token = jwt.sign(
-            { id: user.id },
-            process.env.JWT_SECRET,
-            { expiresIn: "1h" }
-        );
-
-        // ✅ RESPUESTA
-        return res.json({
-            message: "Login exitoso ✅",
-            token,
-            user: {
-                id: user.id,
-                nombre: user.nombre,
-                email: user.email
-            }
-        });
+    return res.json({
+      success: true,
+      message: "Login exitoso 🚀",
+      token,
+      user: {
+        id: user.id,
+        nombre: user.nombre,
+        email: user.email
+      }
     });
+  });
 };

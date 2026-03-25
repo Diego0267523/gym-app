@@ -2,29 +2,38 @@ const jwt = require("jsonwebtoken");
 
 const verifyToken = (req, res, next) => {
   try {
-    let authHeader = req.headers.authorization;
+    const authHeader = req.headers.authorization;
 
-    console.log("🔐 AUTH HEADER:", authHeader);
-
+    // 🔐 Validar header
     if (!authHeader) {
-      return res.status(401).json({ error: "No token provided" });
+      return res.status(401).json({
+        success: false,
+        message: "No autorizado: token requerido"
+      });
     }
 
-    // 🔥 soporte para "Bearer token" o solo "token"
-    let token = authHeader;
+    // 🔥 Soporta:
+    // "Bearer token"
+    // "token"
+    const token = authHeader.startsWith("Bearer ")
+      ? authHeader.split(" ")[1]
+      : authHeader;
 
-    if (authHeader.startsWith("Bearer ")) {
-      token = authHeader.split(" ")[1];
-    }
-
+    // 🔐 Verificar token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+    // 👤 Guardar usuario en request
     req.user = decoded;
 
     next();
+
   } catch (error) {
-    console.log("❌ JWT ERROR:", error.message);
-    return res.status(401).json({ error: "Token inválido" });
+    console.error("❌ Error JWT:", error.message);
+
+    return res.status(401).json({
+      success: false,
+      message: "Token inválido o expirado"
+    });
   }
 };
 
