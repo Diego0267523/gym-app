@@ -8,4 +8,5 @@ router.post("/register", authController.register);
 // LOGIN 👇 ESTA LÍNEA ES LA NUEVA
 router.post("/login", authController.login);
 
+
 module.exports = router;

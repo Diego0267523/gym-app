@@ -1,9 +1,16 @@
 const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 const userModel = require("../models/userModel");
 
-// 👇 MUY IMPORTANTE: exports.register
+// 🔥 REGISTER
 exports.register = (req, res) => {
     const { nombre, email, password } = req.body;
+
+    if (!nombre || !email || !password) {
+        return res.status(400).json({
+            message: "Todos los campos son obligatorios"
+        });
+    }
 
     const hashedPassword = bcrypt.hashSync(password, 10);
 
@@ -12,49 +19,63 @@ exports.register = (req, res) => {
         (err, result) => {
             if (err) {
                 console.log(err);
-                return res.status(500).json({ error: "Error al registrar" });
+                return res.status(500).json({
+                    message: "Error al registrar"
+                });
             }
-            res.json({ message: "Usuario registrado correctamente" });
+
+            return res.json({
+                message: "Usuario registrado correctamente ✅"
+            });
         }
     );
 };
-const jwt = require("jsonwebtoken");
 
-// LOGIN
+
+// 🔥 LOGIN
 exports.login = (req, res) => {
     const { email, password } = req.body;
 
-    // Buscar usuario en DB
+    if (!email || !password) {
+        return res.status(400).json({
+            message: "Email y contraseña son obligatorios"
+        });
+    }
+
     userModel.findUserByEmail(email, (err, results) => {
         if (err) {
             console.log(err);
-            return res.status(500).json({ error: "Error en el servidor" });
+            return res.status(500).json({
+                message: "Error en el servidor"
+            });
         }
 
-        // Si no existe
         if (results.length === 0) {
-            return res.status(400).json({ error: "Usuario no encontrado" });
+            return res.status(401).json({
+                message: "Usuario no encontrado"
+            });
         }
 
         const user = results[0];
 
-        // Comparar contraseña
-        const validPassword = require("bcryptjs").compareSync(password, user.password);
+        const validPassword = bcrypt.compareSync(password, user.password);
 
         if (!validPassword) {
-            return res.status(400).json({ error: "Contraseña incorrecta" });
+            return res.status(401).json({
+                message: "Contraseña incorrecta"
+            });
         }
 
-        // Crear token
+        // 🔥 USANDO VARIABLE DE ENTORNO
         const token = jwt.sign(
             { id: user.id },
-            "secreto123", // luego lo pasamos a .env
+            process.env.JWT_SECRET,
             { expiresIn: "1h" }
         );
 
-        res.json({
-            message: "Login exitoso",
-            token: token
+        return res.json({
+            message: "Login exitoso ✅",
+            token
         });
     });
 };
