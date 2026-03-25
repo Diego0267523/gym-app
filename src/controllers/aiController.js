@@ -1,68 +1,103 @@
+// controllers/aiController.js
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// 🧠 FUNCIÓN AUXILIAR PARA LIMPIAR RESPUESTA
+// 🔥 Función para leer resultado de Gemini de forma segura
 const safeText = (result) => {
   try {
     const text = result?.response?.text();
     if (!text || text.trim() === "") {
-      return null;
+      return "No tengo una respuesta clara ahora mismo 🤔 pero te recomiendo mantener constancia y hábitos saludables 💪";
     }
     return text.trim();
   } catch (err) {
-    console.log("❌ Error leyendo respuesta IA:", err);
-    return null;
+    console.log("❌ ERROR leyendo respuesta IA:", err);
+    return "Hubo un problema con la IA 😢 intenta de nuevo.";
   }
 };
 
-// 🔥 GENERAR RUTINA
-exports.generateRoutine = async (req, res) => {
-  try {
-    const { objetivo } = req.body;
+// 🔥 Detección de tipo de pregunta
+const classifyQuestion = (pregunta) => {
+  const q = pregunta.toLowerCase();
 
-    if (!objetivo) {
-      return res.status(400).json({
-        message: "Debes enviar un objetivo ⚠️"
-      });
-    }
+  if (q.includes("rutina") || q.includes("entrenamiento") || q.includes("día de gym")) {
+    return "rutina";
+  }
+  if (q.includes("bajar") || q.includes("perder peso") || q.includes("kilos") || q.includes("grasa")) {
+    return "peso";
+  }
+  if (q.includes("nutrición") || q.includes("comer") || q.includes("dieta") || q.includes("calorías")) {
+    return "nutricion";
+  }
+  return "general";
+};
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash"
-    });
-
-    const prompt = `
+// 🔥 Prompt inteligente según tipo
+const buildPrompt = (tipo, pregunta) => {
+  switch (tipo) {
+    case "rutina":
+      return `
 Eres un entrenador personal profesional experto en gimnasio.
-
-Crea una rutina basada en este objetivo: ${objetivo}
-
+Contexto: La persona está en el gym ahora mismo.
 Reglas:
-- Respuesta corta y práctica
-- Incluye ejercicios, series y repeticiones
-- Formato claro (tipo lista)
-- Nada de texto innecesario
-- Que se pueda hacer en un gym real
+- Responde siempre y de forma práctica.
+- Incluye ejercicios, series y repeticiones si es relevante.
+- Sé directo, amigable y claro.
+Pregunta: ${pregunta}
+      `;
+    case "peso":
+      return `
+Eres un entrenador personal experto en pérdida de grasa y control de peso.
+Contexto: La persona está interesada en bajar de peso de forma segura.
+Reglas:
+- Responde siempre y da estimaciones realistas.
+- Si no puedes asegurar exactitud, da un rango o consejos prácticos.
+- Incluye hábitos, frecuencia de entrenamiento y recomendaciones de dieta.
+Pregunta: ${pregunta}
+      `;
+    case "nutricion":
+      return `
+Eres un experto en nutrición y dietética para personas activas.
+Contexto: La persona busca mejorar su alimentación.
+Reglas:
+- Responde siempre con consejos claros y prácticos.
+- Incluye tips de comidas, horarios y macros si es relevante.
+Pregunta: ${pregunta}
+      `;
+    default:
+      return `
+Eres un entrenador personal profesional experto en fitness.
+Reglas:
+- Responde siempre de forma clara y directa.
+- Da consejos aplicables en el momento.
+Pregunta: ${pregunta}
+      `;
+  }
+};
 
-Ejemplo de formato:
-- Ejercicio: series x reps
-`;
+// 🔥 Controlador para chat inteligente
+exports.chatAssistant = async (req, res) => {
+  try {
+    const { pregunta } = req.body;
 
-    console.log("📤 OBJETIVO:", objetivo);
-
-    const result = await model.generateContent(prompt);
-    const rutina = safeText(result);
-
-    if (!rutina) {
-      console.warn("⚠️ IA devolvió vacío");
-      return res.status(500).json({
-        message: "La IA no generó rutina 🤖"
-      });
+    if (!pregunta || pregunta.trim() === "") {
+      return res.status(400).json({ message: "La pregunta no puede estar vacía ❌" });
     }
 
-    res.json({ rutina });
+    const tipo = classifyQuestion(pregunta);
+    const prompt = buildPrompt(tipo, pregunta);
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const result = await model.generateContent(prompt);
+
+    console.log("📥 RAW GEMINI:", result); // log completo para debug
+
+    const respuesta = safeText(result);
+
+    res.json({ respuesta });
 
   } catch (error) {
-    console.log("🔥 ERROR GEMINI RUTINA:", error);
+    console.log("🔥 ERROR IA CHAT:", error);
 
     res.status(500).json({
       message: "Error IA",
@@ -71,76 +106,32 @@ Ejemplo de formato:
   }
 };
 
-
-// 🤖 CHAT INTELIGENTE FITNESS
-exports.chatAssistant = async (req, res) => {
+// 🔥 Controlador para generar rutinas (opcional)
+exports.generateRoutine = async (req, res) => {
   try {
-    const { pregunta } = req.body;
-
-    if (!pregunta) {
-      return res.status(400).json({
-        message: "Debes enviar una pregunta ⚠️"
-      });
+    const { objetivo } = req.body;
+    if (!objetivo || objetivo.trim() === "") {
+      return res.status(400).json({ message: "El objetivo no puede estar vacío ❌" });
     }
-
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash"
-    });
 
     const prompt = `
-Eres un entrenador personal profesional experto en:
-- gimnasio
-- pérdida de grasa
-- ganancia muscular
-- nutrición básica
+Eres un entrenador profesional.
+Dame consejos prácticos para alcanzar mi objetivo: ${objetivo}.
+Incluye ejercicios, series y repeticiones si aplica.
+Responde de manera corta, clara y aplicable.
+    `;
 
-Contexto:
-La persona probablemente está en el gym ahora mismo.
-
-Reglas:
-- Responde SIEMPRE en español
-- Sé claro, directo y práctico
-- No te extiendas demasiado
-- Da consejos aplicables en ese momento
-- Si preguntan sobre bajar peso, da tiempos REALISTAS
-- Explica brevemente el por qué
-- Usa listas si ayuda
-- Nunca dejes la respuesta vacía
-- Si la pregunta es general, da una recomendación útil igualmente
-
-Ejemplos:
-Pregunta: ¿cuánto demoro en bajar 4 kilos?
-Respuesta:
-Bajar 4 kg puede tomar entre 4 y 8 semanas.
-- Déficit calórico moderado
-- Entrena 4-5 veces por semana
-- Prioriza proteína
-- Duerme bien
-
-Pregunta del usuario:
-${pregunta}
-`;
-
-    console.log("📤 PREGUNTA:", pregunta);
-
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const result = await model.generateContent(prompt);
-    const respuesta = safeText(result);
 
-    console.log("📥 RESPUESTA IA:", respuesta);
+    console.log("📥 RAW GEMINI RUTINA:", result);
 
-    if (!respuesta) {
-      console.warn("⚠️ IA devolvió vacío");
+    const rutina = safeText(result);
 
-      return res.json({
-        respuesta: "No tengo una respuesta clara ahora mismo 🤔 intenta reformular la pregunta."
-      });
-    }
-
-    res.json({ respuesta });
+    res.json({ rutina });
 
   } catch (error) {
-    console.log("🔥 ERROR IA CHAT:", error);
-
+    console.log("🔥 ERROR GEMINI:", error);
     res.status(500).json({
       message: "Error IA",
       error: error.message
