@@ -21,6 +21,15 @@ const findUserByEmail = (email, callback) => {
     `;
     db.query(sql, [email], callback);
 };
+// Buscar usuario por ID
+const findUserById = (id, callback) => {
+    const sql = `
+        SELECT id, nombre, email 
+        FROM usuarios 
+        WHERE id = ?
+    `;
+    db.query(sql, [id], callback);
+};
 
 
 // ==========================
@@ -99,6 +108,7 @@ const saveHealth = (userId, data, callback) => {
 module.exports = {
     createUser,
     findUserByEmail,
+    findUserById, // 🔥 AÑADE ESTO
     saveMeasurements,
     getMeasurementsByUserId,
     saveProfile,

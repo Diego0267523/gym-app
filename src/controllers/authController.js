@@ -189,3 +189,46 @@ exports.login = (req, res) => {
     });
   });
 };
+// ==========================
+// 👤 GET PROFILE (FIX)
+// ==========================
+exports.getProfile = (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    userModel.findUserById(userId, (err, results) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({
+          success: false,
+          message: "Error en servidor"
+        });
+      }
+
+      if (results.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Usuario no encontrado"
+        });
+      }
+
+      const user = results[0];
+
+      return res.json({
+        success: true,
+        user: {
+          id: user.id,
+          nombre: user.nombre,
+          email: user.email
+        }
+      });
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Error interno"
+    });
+  }
+};
