@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 const userModel = require("../models/userModel");
 
 // ==========================
-// 🔥 REGISTER PRO (MEJORADO)
+// 🔥 REGISTER PRO (FIX TOTAL)
 // ==========================
 exports.register = async (req, res) => {
   try {
@@ -59,22 +59,28 @@ exports.register = async (req, res) => {
 
           const userId = result.insertId;
 
-          // 🔥 GUARDAR TODO EN PARALELO (MEJOR PERFORMANCE)
+          // 🔥 GUARDAR TODO (CON CONTROL DE ERRORES REAL)
           Promise.all([
 
             // 📏 MEDIDAS
-            new Promise((resolve) => {
+            new Promise((resolve, reject) => {
               if (!peso && !altura) return resolve();
 
               userModel.saveMeasurements(
                 userId,
                 { peso: peso || null, altura: altura || null },
-                () => resolve()
+                (err) => {
+                  if (err) {
+                    console.error("❌ ERROR MEDIDAS:", err);
+                    return reject(err);
+                  }
+                  resolve();
+                }
               );
             }),
 
             // 🎯 PERFIL FITNESS
-            new Promise((resolve) => {
+            new Promise((resolve, reject) => {
               userModel.saveProfile(
                 userId,
                 {
@@ -86,12 +92,24 @@ exports.register = async (req, res) => {
                   profesion,
                   sueno
                 },
-                () => resolve()
+                (err) => {
+                  if (err) {
+                    console.error("❌ ERROR PERFIL:", err);
+                    return reject(err);
+                  }
+                  resolve();
+                }
               );
             }),
 
             // 🏥 SALUD
-            new Promise((resolve) => {
+            new Promise((resolve, reject) => {
+
+              // 🔥 NO guardar si está vacío
+              if (!condiciones && !medicamentos && !lesiones && !restricciones) {
+                return resolve();
+              }
+
               userModel.saveHealth(
                 userId,
                 {
@@ -100,119 +118,34 @@ exports.register = async (req, res) => {
                   lesiones,
                   restricciones
                 },
-                () => resolve()
+                (err) => {
+                  if (err) {
+                    console.error("❌ ERROR SALUD:", err);
+                    return reject(err);
+                  }
+                  resolve();
+                }
               );
             })
 
-          ]).then(() => {
+          ])
+          .then(() => {
             return res.json({
               success: true,
               message: "Usuario registrado correctamente 🚀",
               userId
             });
+          })
+          .catch((error) => {
+            console.error("❌ ERROR EN PROMISE.ALL:", error);
+            return res.status(500).json({
+              success: false,
+              message: "Error guardando datos del usuario"
+            });
           });
 
         }
       );
-    });
-
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      success: false,
-      message: "Error interno"
-    });
-  }
-};
-
-// ==========================
-// 🔥 LOGIN PRO (MEJORADO)
-// ==========================
-exports.login = (req, res) => {
-  const { email, password } = req.body;
-
-  // ✅ VALIDACIÓN
-  if (!email || !password) {
-    return res.status(400).json({
-      success: false,
-      message: "Email y contraseña obligatorios"
-    });
-  }
-
-  userModel.findUserByEmail(email, async (err, results) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({
-        success: false,
-        message: "Error en servidor"
-      });
-    }
-
-    if (results.length === 0) {
-      return res.status(401).json({
-        success: false,
-        message: "Usuario no encontrado"
-      });
-    }
-
-    const user = results[0];
-
-    // 🔐 VALIDAR PASSWORD
-    const validPassword = await bcrypt.compare(password, user.password);
-
-    if (!validPassword) {
-      return res.status(401).json({
-        success: false,
-        message: "Contraseña incorrecta"
-      });
-    }
-
-    // 🔥 TOKEN (MEJORADO)
-    const token = jwt.sign(
-      {
-        id: user.id,
-        email: user.email
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" } // 🔥 mejor UX
-    );
-
-    return res.json({
-      success: true,
-      message: "Login exitoso 🚀",
-      token,
-      user: {
-        id: user.id,
-        nombre: user.nombre,
-        email: user.email
-      }
-    });
-  });
-};
-// ==========================
-// 👤 GET PROFILE (FIX)
-// ==========================
-exports.getProfile = (req, res) => {
-  try {
-    const userId = req.user.id;
-
-    userModel.getFullProfileById(userId, (err, results) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({
-          success: false,
-          message: "Error en servidor"
-        });
-      }
-
-      if (results.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: "Usuario no encontrado"
-        });
-      }
-
-      return res.json(results[0]); // 🔥 DIRECTO
     });
 
   } catch (error) {
