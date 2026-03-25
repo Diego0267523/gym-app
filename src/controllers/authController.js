@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 const userModel = require("../models/userModel");
 
 // ==========================
-// 🔥 REGISTER PRO (MEJORADO)
+// 🔥 REGISTER PRO FIXED
 // ==========================
 exports.register = async (req, res) => {
   try {
@@ -42,13 +42,13 @@ exports.register = async (req, res) => {
         });
       }
 
-      // 🔐 HASH
+      // 🔐 HASH PASSWORD
       const hashedPassword = await bcrypt.hash(password, 10);
 
       // 👤 CREAR USUARIO
       userModel.createUser(
         { nombre, email, password: hashedPassword },
-        (err, result) => {
+        async (err, result) => {
           if (err) {
             console.error(err);
             return res.status(500).json({
@@ -59,160 +59,91 @@ exports.register = async (req, res) => {
 
           const userId = result.insertId;
 
-          // 🔥 GUARDAR TODO EN PARALELO (MEJOR PERFORMANCE)
-          Promise.all([
+          try {
+            // 🔥 GUARDAR TODO CON CONTROL DE ERRORES
+            await Promise.all([
 
-            // 📏 MEDIDAS
-            new Promise((resolve) => {
-              if (!peso && !altura) return resolve();
+              // 📏 MEDIDAS
+              new Promise((resolve, reject) => {
+                if (!peso && !altura) return resolve();
 
-              userModel.saveMeasurements(
-                userId,
-                { peso: peso || null, altura: altura || null },
-                () => resolve()
-              );
-            }),
+                userModel.saveMeasurements(
+                  userId,
+                  {
+                    peso: peso || null,
+                    altura: altura || null
+                  },
+                  (err) => {
+                    if (err) {
+                      console.error("Error en medidas:", err);
+                      return reject(err);
+                    }
+                    resolve();
+                  }
+                );
+              }),
 
-            // 🎯 PERFIL FITNESS
-            new Promise((resolve) => {
-              userModel.saveProfile(
-                userId,
-                {
-                  genero,
-                  objetivo,
-                  frecuencia,
-                  nivelActividad,
-                  tiempoObjetivo,
-                  profesion,
-                  sueno
-                },
-                () => resolve()
-              );
-            }),
+              // 🎯 PERFIL
+              new Promise((resolve, reject) => {
+                userModel.saveProfile(
+                  userId,
+                  {
+                    genero,
+                    objetivo,
+                    frecuencia,
+                    nivelActividad,
+                    tiempoObjetivo,
+                    profesion,
+                    sueno
+                  },
+                  (err) => {
+                    if (err) {
+                      console.error("Error en perfil:", err);
+                      return reject(err);
+                    }
+                    resolve();
+                  }
+                );
+              }),
 
-            // 🏥 SALUD
-            new Promise((resolve) => {
-              userModel.saveHealth(
-                userId,
-                {
-                  condiciones,
-                  medicamentos,
-                  lesiones,
-                  restricciones
-                },
-                () => resolve()
-              );
-            })
+              // 🏥 SALUD (🔥 AQUÍ ESTABA EL BUG)
+              new Promise((resolve, reject) => {
+                userModel.saveHealth(
+                  userId,
+                  {
+                    condiciones,
+                    medicamentos,
+                    lesiones,
+                    restricciones
+                  },
+                  (err) => {
+                    if (err) {
+                      console.error("Error en salud:", err);
+                      return reject(err);
+                    }
+                    resolve();
+                  }
+                );
+              })
 
-          ]).then(() => {
+            ]);
+
+            // ✅ TODO OK
             return res.json({
               success: true,
               message: "Usuario registrado correctamente 🚀",
               userId
             });
-          });
 
+          } catch (error) {
+            console.error("Error guardando datos:", error);
+            return res.status(500).json({
+              success: false,
+              message: "Error al guardar datos del usuario"
+            });
+          }
         }
       );
-    });
-
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      success: false,
-      message: "Error interno"
-    });
-  }
-};
-
-// ==========================
-// 🔥 LOGIN PRO (MEJORADO)
-// ==========================
-exports.login = (req, res) => {
-  const { email, password } = req.body;
-
-  // ✅ VALIDACIÓN
-  if (!email || !password) {
-    return res.status(400).json({
-      success: false,
-      message: "Email y contraseña obligatorios"
-    });
-  }
-
-  userModel.findUserByEmail(email, async (err, results) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({
-        success: false,
-        message: "Error en servidor"
-      });
-    }
-
-    if (results.length === 0) {
-      return res.status(401).json({
-        success: false,
-        message: "Usuario no encontrado"
-      });
-    }
-
-    const user = results[0];
-
-    // 🔐 VALIDAR PASSWORD
-    const validPassword = await bcrypt.compare(password, user.password);
-
-    if (!validPassword) {
-      return res.status(401).json({
-        success: false,
-        message: "Contraseña incorrecta"
-      });
-    }
-
-    // 🔥 TOKEN (MEJORADO)
-    const token = jwt.sign(
-      {
-        id: user.id,
-        email: user.email
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" } // 🔥 mejor UX
-    );
-
-    return res.json({
-      success: true,
-      message: "Login exitoso 🚀",
-      token,
-      user: {
-        id: user.id,
-        nombre: user.nombre,
-        email: user.email
-      }
-    });
-  });
-};
-// ==========================
-// 👤 GET PROFILE (FIX)
-// ==========================
-exports.getProfile = (req, res) => {
-  try {
-    const userId = req.user.id;
-
-    userModel.getFullProfileById(userId, (err, results) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({
-          success: false,
-          message: "Error en servidor"
-        });
-      }
-
-      if (results.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: "Usuario no encontrado"
-        });
-      }
-
-      return res.json(results[0]); // 🔥 DIRECTO
     });
 
   } catch (error) {
