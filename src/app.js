@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const aiRoutes = require("./routes/aiRoutes");
+const PORT = process.env.PORT || 3000;
 
 require("./config/db");
 
@@ -20,6 +21,6 @@ app.use("/api/auth", authRoutes);
 app.use("/api/training", trainingRoutes);
 app.use("/api/ai", aiRoutes);
 
-app.listen(3000, () => {
-    console.log("Servidor corriendo en http://localhost:3000");
+app.listen(PORT, () => {
+    console.log(`Servidor corriendo en puerto ${PORT}`);
 });
