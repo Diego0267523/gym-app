@@ -76,7 +76,7 @@ exports.getTrainings = (req, res) => {
     trainingModel.getTrainingsByUser(user_id, (err, results) => {
         if (err) {
             console.log(err);
-            return res.status(500).json({ error: "Error obteniendo datos" });
+            return res.status(500).json({ error: "Error obteniefndo datos" });
         }
 
         // 🔥 AGRUPAR ENTRENAMIENTOS
