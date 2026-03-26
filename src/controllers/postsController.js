@@ -2,7 +2,7 @@ const postModel = require("../models/postModel");
 const likesModel = require("../models/likesModel");
 const commentsModel = require("../models/commentsModel");
 
-exports.createPost = async (req, res) => {
+exports.createPost = (req, res) => {
   try {
     const caption = req.body.caption;
     const user_id = req.user?.id;
@@ -21,29 +21,39 @@ exports.createPost = async (req, res) => {
       return res.status(500).json({ success: false, message: "Error al procesar la imagen" });
     }
 
-    await postModel.createPost(user_id, image_url, caption);
-    return res.json({ success: true, message: "Post creado" });
+    postModel.createPost(user_id, image_url, caption, (err, result) => {
+      if (err) {
+        console.error("Error en createPost:", err);
+        return res.status(500).json({ success: false, message: "Error al crear post" });
+      }
+      return res.json({ success: true, message: "Post creado" });
+    });
   } catch (error) {
     console.error("Error en createPost:", error);
     return res.status(500).json({ success: false, message: "Error al crear post" });
   }
 };
 
-exports.getPosts = async (req, res) => {
+exports.getPosts = (req, res) => {
   try {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
     const offset = (page - 1) * limit;
 
-    const posts = await postModel.getPosts(limit, offset);
-    return res.json({ success: true, posts, page, limit });
+    postModel.getPosts(limit, offset, (err, posts) => {
+      if (err) {
+        console.error("Error in getPosts:", err);
+        return res.status(500).json({ success: false, message: "Error obteniendo posts" });
+      }
+      return res.json({ success: true, posts, page, limit });
+    });
   } catch (error) {
     console.error("Error in getPosts:", error);
     return res.status(500).json({ success: false, message: "Error obteniendo posts" });
   }
 };
 
-exports.toggleLike = async (req, res) => {
+exports.toggleLike = (req, res) => {
   try {
     const userId = req.user?.id;
     const postId = parseInt(req.params.id, 10);
@@ -55,32 +65,48 @@ exports.toggleLike = async (req, res) => {
       return res.status(400).json({ success: false, message: "ID de post inválido" });
     }
 
-    const likeResult = await likesModel.toggleLike(userId, postId);
-    const likeCount = await likesModel.getLikesCount(postId);
+    likesModel.toggleLike(userId, postId, (err, likeResult) => {
+      if (err) {
+        console.error("Error toggleLike:", err);
+        return res.status(500).json({ success: false, message: "Error toggling like" });
+      }
 
-    return res.json({ success: true, data: { action: likeResult.action, likes: likeCount } });
+      likesModel.getLikesCount(postId, (err, likeCount) => {
+        if (err) {
+          console.error("Error getLikesCount:", err);
+          return res.status(500).json({ success: false, message: "Error toggling like" });
+        }
+
+        return res.json({ success: true, data: { action: likeResult.action, likes: likeCount } });
+      });
+    });
   } catch (error) {
     console.error("Error toggleLike:", error);
     return res.status(500).json({ success: false, message: "Error toggling like" });
   }
 };
 
-exports.getComments = async (req, res) => {
+exports.getComments = (req, res) => {
   try {
     const postId = parseInt(req.params.id, 10);
     if (!postId || isNaN(postId)) {
       return res.status(400).json({ success: false, message: "ID de post inválido" });
     }
 
-    const comments = await commentsModel.getComments(postId);
-    return res.json({ success: true, comments });
+    commentsModel.getComments(postId, (err, comments) => {
+      if (err) {
+        console.error("Error getComments:", err);
+        return res.status(500).json({ success: false, message: "Error obteniendo comentarios" });
+      }
+      return res.json({ success: true, comments });
+    });
   } catch (error) {
     console.error("Error getComments:", error);
     return res.status(500).json({ success: false, message: "Error obteniendo comentarios" });
   }
 };
 
-exports.addComment = async (req, res) => {
+exports.addComment = (req, res) => {
   try {
     const userId = req.user?.id;
     const postId = parseInt(req.params.id, 10);
@@ -96,8 +122,13 @@ exports.addComment = async (req, res) => {
       return res.status(400).json({ success: false, message: "El comentario no puede estar vacío" });
     }
 
-    const newComment = await commentsModel.addComment(userId, postId, comment);
-    return res.json({ success: true, comment: newComment });
+    commentsModel.addComment(userId, postId, comment, (err, newComment) => {
+      if (err) {
+        console.error("Error addComment:", err);
+        return res.status(500).json({ success: false, message: "Error creando comentario" });
+      }
+      return res.json({ success: true, comment: newComment });
+    });
   } catch (error) {
     console.error("Error addComment:", error);
     return res.status(500).json({ success: false, message: "Error creando comentario" });

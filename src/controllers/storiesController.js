@@ -1,7 +1,7 @@
 const storiesModel = require("../models/storiesModel");
 
 // Crear una historia
-exports.createStory = async (req, res) => {
+exports.createStory = (req, res) => {
   try {
     const user_id = req.user?.id;
     const file = req.file;
@@ -19,8 +19,13 @@ exports.createStory = async (req, res) => {
       return res.status(500).json({ success: false, message: "Error al procesar la imagen" });
     }
 
-    await storiesModel.createStory(user_id, image_url);
-    return res.json({ success: true, message: "Historia creada exitosamente" });
+    storiesModel.createStory(user_id, image_url, (err, result) => {
+      if (err) {
+        console.error("Error en createStory:", err);
+        return res.status(500).json({ success: false, message: "Error al crear historia" });
+      }
+      return res.json({ success: true, message: "Historia creada exitosamente" });
+    });
   } catch (error) {
     console.error("Error en createStory:", error);
     return res.status(500).json({ success: false, message: "Error al crear historia" });
@@ -28,10 +33,15 @@ exports.createStory = async (req, res) => {
 };
 
 // Obtener todas las historias (máximo 24 horas)
-exports.getStories = async (req, res) => {
+exports.getStories = (req, res) => {
   try {
-    const stories = await storiesModel.getStories();
-    return res.json({ success: true, stories });
+    storiesModel.getStories((err, stories) => {
+      if (err) {
+        console.error("Error getting stories:", err);
+        return res.status(500).json({ success: false, message: "Error obteniendo historias" });
+      }
+      return res.json({ success: true, stories });
+    });
   } catch (error) {
     console.error("Error getting stories:", error);
     return res.status(500).json({ success: false, message: "Error obteniendo historias" });
@@ -39,7 +49,7 @@ exports.getStories = async (req, res) => {
 };
 
 // Obtener historias de un usuario específico
-exports.getUserStories = async (req, res) => {
+exports.getUserStories = (req, res) => {
   try {
     const userId = parseInt(req.params.userId, 10);
     
@@ -47,8 +57,13 @@ exports.getUserStories = async (req, res) => {
       return res.status(400).json({ success: false, message: "ID de usuario inválido" });
     }
 
-    const stories = await storiesModel.getUserStories(userId);
-    return res.json({ success: true, stories });
+    storiesModel.getUserStories(userId, (err, stories) => {
+      if (err) {
+        console.error("Error getting user stories:", err);
+        return res.status(500).json({ success: false, message: "Error obteniendo historias del usuario" });
+      }
+      return res.json({ success: true, stories });
+    });
   } catch (error) {
     console.error("Error getting user stories:", error);
     return res.status(500).json({ success: false, message: "Error obteniendo historias del usuario" });
@@ -56,7 +71,7 @@ exports.getUserStories = async (req, res) => {
 };
 
 // Eliminar una historia propia
-exports.deleteStory = async (req, res) => {
+exports.deleteStory = (req, res) => {
   try {
     const userId = req.user?.id;
     const storyId = parseInt(req.params.id, 10);
@@ -69,18 +84,29 @@ exports.deleteStory = async (req, res) => {
       return res.status(400).json({ success: false, message: "ID de historia inválido" });
     }
 
-    const story = await storiesModel.getStoryById(storyId);
-    if (!story) {
-      return res.status(404).json({ success: false, message: "Historia no encontrada" });
-    }
+    storiesModel.getStoryById(storyId, (err, story) => {
+      if (err) {
+        console.error("Error getting story:", err);
+        return res.status(500).json({ success: false, message: "Error al eliminar historia" });
+      }
 
-    // Verificar que el usuario sea el propietario
-    if (story.user_id !== userId) {
-      return res.status(403).json({ success: false, message: "No tienes permisos para eliminar esta historia" });
-    }
+      if (!story) {
+        return res.status(404).json({ success: false, message: "Historia no encontrada" });
+      }
 
-    await storiesModel.deleteStory(storyId);
-    return res.json({ success: true, message: "Historia eliminada" });
+      // Verificar que el usuario sea el propietario
+      if (story.user_id !== userId) {
+        return res.status(403).json({ success: false, message: "No tienes permisos para eliminar esta historia" });
+      }
+
+      storiesModel.deleteStory(storyId, (err, result) => {
+        if (err) {
+          console.error("Error deleting story:", err);
+          return res.status(500).json({ success: false, message: "Error al eliminar historia" });
+        }
+        return res.json({ success: true, message: "Historia eliminada" });
+      });
+    });
   } catch (error) {
     console.error("Error deleting story:", error);
     return res.status(500).json({ success: false, message: "Error al eliminar historia" });
@@ -88,10 +114,15 @@ exports.deleteStory = async (req, res) => {
 };
 
 // Ejecutar limpieza de historias viejas (> 24 horas)
-exports.cleanOldStories = async (req, res) => {
+exports.cleanOldStories = (req, res) => {
   try {
-    await storiesModel.deleteOldStories();
-    return res.json({ success: true, message: "Historias antiguas eliminadas" });
+    storiesModel.deleteOldStories((err, result) => {
+      if (err) {
+        console.error("Error cleaning old stories:", err);
+        return res.status(500).json({ success: false, message: "Error al limpiar historias" });
+      }
+      return res.json({ success: true, message: "Historias antiguas eliminadas" });
+    });
   } catch (error) {
     console.error("Error cleaning old stories:", error);
     return res.status(500).json({ success: false, message: "Error al limpiar historias" });

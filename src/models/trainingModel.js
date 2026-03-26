@@ -1,5 +1,37 @@
 const db = require("../config/db");
 
+const createTraining = (user_id, series, callback) => {
+    const sqlTraining = "INSERT INTO entrenamientos (user_id) VALUES (?)";
+
+    db.query(sqlTraining, [user_id], (err, result) => {
+        if (err) {
+            return callback(err);
+        }
+
+        const entrenamiento_id = result.insertId;
+
+        // 🔥 PREPARAR SERIES
+        const sqlSeries = `
+            INSERT INTO series (entrenamiento_id, ejercicio, peso, repeticiones)
+            VALUES ?
+        `;
+
+        const values = series.map(s => [
+            entrenamiento_id,
+            s.ejercicio.trim(),
+            Number(s.peso),
+            Number(s.repeticiones)
+        ]);
+
+        db.query(sqlSeries, [values], (err2, result2) => {
+            if (err2) {
+                return callback(err2);
+            }
+            callback(null, result2);
+        });
+    });
+};
+
 const getTrainingsByUser = (user_id, callback) => {
     const sql = `
         SELECT 
@@ -18,5 +50,6 @@ const getTrainingsByUser = (user_id, callback) => {
 };
 
 module.exports = {
+    createTraining,
     getTrainingsByUser
 };

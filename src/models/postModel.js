@@ -1,15 +1,14 @@
 const db = require("../config/db");
 
-exports.createPost = async (user_id, image_url, caption) => {
+exports.createPost = (user_id, image_url, caption, callback) => {
   const sql = `
     INSERT INTO posts (user_id, image_url, caption)
     VALUES (?, ?, ?)
   `;
-  const [result] = await db.execute(sql, [user_id, image_url, caption]);
-  return result;
+  db.query(sql, [user_id, image_url, caption], callback);
 };
 
-exports.getPosts = async (limit, offset) => {
+exports.getPosts = (limit, offset, callback) => {
   const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 10;
   const safeOffset = Number.isInteger(offset) && offset >= 0 ? offset : 0;
   const sql = `
@@ -17,14 +16,17 @@ exports.getPosts = async (limit, offset) => {
     FROM posts p
     JOIN usuarios u ON p.user_id = u.id
     ORDER BY p.created_at DESC
-    LIMIT ${safeLimit} OFFSET ${safeOffset}
+    LIMIT ? OFFSET ?
   `;
-  const [rows] = await db.execute(sql);
-  return rows;
+  db.query(sql, [safeLimit, safeOffset], callback);
 };
 
-exports.getPostById = async (postId) => {
+exports.getPostById = (postId, callback) => {
   const sql = `SELECT * FROM posts WHERE id = ?`;
-  const [rows] = await db.execute(sql, [postId]);
-  return rows[0];
+  db.query(sql, [postId], (err, rows) => {
+    if (err) {
+      return callback(err);
+    }
+    callback(null, rows[0]);
+  });
 };

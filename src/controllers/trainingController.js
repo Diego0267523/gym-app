@@ -1,5 +1,4 @@
 const trainingModel = require("../models/trainingModel");
-const db = require("../config/db");
 
 // Crear entrenamiento completo con series
 exports.createTraining = (req, res) => {
@@ -37,36 +36,19 @@ exports.createTraining = (req, res) => {
     // 🔥 CREAR ENTRENAMIENTO
     const sqlTraining = "INSERT INTO entrenamientos (user_id) VALUES (?)";
 
-    db.query(sqlTraining, [user_id], (err, result) => {
+    trainingModel.createTraining(user_id, series, (err, result) => {
         if (err) {
             console.log(err);
             return res.status(500).json({ message: "Error creando entrenamiento" });
         }
 
-        const entrenamiento_id = result.insertId;
+        if (err) {
+            console.log(err);
+            return res.status(500).json({ message: "Error creando entrenamiento" });
+        }
 
-        // 🔥 PREPARAR SERIES
-        const sqlSeries = `
-            INSERT INTO series (entrenamiento_id, ejercicio, peso, repeticiones)
-            VALUES ?
-        `;
-
-        const values = series.map(s => [
-            entrenamiento_id,
-            s.ejercicio.trim(),
-            Number(s.peso),
-            Number(s.repeticiones)
-        ]);
-
-        db.query(sqlSeries, [values], (err2) => {
-            if (err2) {
-                console.log(err2);
-                return res.status(500).json({ message: "Error guardando series" });
-            }
-
-            res.json({
-                message: "Entrenamiento completo guardado 🔥"
-            });
+        res.json({
+            message: "Entrenamiento completo guardado 🔥"
         });
     });
 };

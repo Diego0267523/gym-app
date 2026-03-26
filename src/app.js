@@ -19,8 +19,13 @@ const storiesModel = require("./models/storiesModel");
 cron.schedule('0 * * * *', async () => {
   try {
     console.log('🧹 [CRON] Limpiando historias antiguas (> 24 horas)...');
-    await storiesModel.deleteOldStories();
-    console.log('✅ [CRON] Historias antiguas eliminadas');
+    storiesModel.deleteOldStories((err, result) => {
+      if (err) {
+        console.error('❌ [CRON] Error al limpiar historias:', err.message);
+      } else {
+        console.log('✅ [CRON] Historias antiguas eliminadas');
+      }
+    });
   } catch (error) {
     console.error('❌ [CRON] Error al limpiar historias:', error.message);
   }

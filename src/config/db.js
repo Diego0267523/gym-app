@@ -18,4 +18,4 @@ const pool = mysql.createPool({
 
 console.log("✅ DB pool configurado");
 
-module.exports = pool.promise();
+module.exports = pool;
