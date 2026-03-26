@@ -106,3 +106,26 @@ CREATE TABLE IF NOT EXISTS series (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (entrenamiento_id) REFERENCES entrenamientos(id) ON DELETE CASCADE
 );
+
+-- Crear tabla notificaciones si no existe (para likes y comentarios)
+CREATE TABLE IF NOT EXISTS notificaciones (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL, -- Usuario que recibe la notificación
+    from_user_id INT NOT NULL, -- Usuario que realizó la acción
+    type VARCHAR(20) NOT NULL, -- 'like', 'comment', 'follow', etc.
+    post_id INT, -- ID del post relacionado (opcional)
+    comment_id INT, -- ID del comentario relacionado (opcional)
+    message TEXT, -- Mensaje personalizado de la notificación
+    is_read BOOLEAN DEFAULT FALSE, -- Si fue leída
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    FOREIGN KEY (from_user_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+    FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE
+);
+
+-- Corregir tipo de columna tiempo_objetivo si es necesario
+ALTER TABLE perfil MODIFY COLUMN tiempo_objetivo VARCHAR(50);
+
+-- Corregir tipo de columna sueno si es necesario
+ALTER TABLE perfil MODIFY COLUMN sueno VARCHAR(50);

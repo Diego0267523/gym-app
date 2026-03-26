@@ -6,14 +6,54 @@ const path = require("path");
 const initDatabase = () => {
   const createTablesSQL = fs.readFileSync(path.join(__dirname, "create_tables.sql"), "utf8");
 
-  // Ejecutar el SQL completo
-  db.query(createTablesSQL, (err, result) => {
-    if (err) {
-      console.error("❌ Error creando tablas:", err);
-    } else {
-      console.log("✅ Tablas verificadas/creadas correctamente");
+  // Remover comments y dividir en statements individuales
+  const cleanSQL = createTablesSQL
+    .split('\n')
+    .filter(line => !line.trim().startsWith('--') && line.trim().length > 0)
+    .join('\n');
+
+  // Dividir por punto y coma, pero solo statements completos
+  const statements = cleanSQL
+    .split(';')
+    .map(stmt => stmt.trim())
+    .filter(stmt => stmt.length > 0 && (stmt.toUpperCase().includes('CREATE TABLE') || stmt.toUpperCase().includes('ALTER TABLE')));
+
+  console.log(`📋 Encontrados ${statements.length} statements CREATE TABLE`);
+
+  // Ejecutar cada statement de manera secuencial para evitar sobrecargar conexiones
+  let completed = 0;
+  const total = statements.length;
+
+  if (statements.length === 0) {
+    console.log("❌ No se encontraron statements CREATE TABLE válidos");
+    return;
+  }
+
+  const executeNext = () => {
+    if (completed >= total) {
+      console.log("✅ Inicialización de BD completada");
+      return;
     }
-  });
+
+    const statement = statements[completed];
+    const fullStatement = statement + ';'; // Agregar el punto y coma que se perdió en el split
+
+    db.query(fullStatement, (err, result) => {
+      if (err) {
+        console.error(`❌ Error en tabla ${completed + 1}:`, err.message);
+        console.error(`SQL: ${fullStatement.substring(0, 100)}...`);
+      } else {
+        console.log(`✅ Tabla ${completed + 1}/${total} creada/verificada`);
+      }
+
+      completed++;
+      // Ejecutar el siguiente statement después de un delay mayor
+      setTimeout(executeNext, 500);
+    });
+  };
+
+  // Iniciar la ejecución secuencial
+  executeNext();
 
   // Verificar columna avatar
   const checkAvatarSQL = `
