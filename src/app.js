@@ -3,13 +3,18 @@ const express = require("express");
 const cors = require("cors");
 const aiRoutes = require("./routes/aiRoutes");
 const postRoutes = require("./routes/postRoutes");
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
 require("./config/db");
 
 const app = express();
 
-app.use(cors());
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
+app.use(cors({
+  origin: FRONTEND_URL,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  credentials: true
+}));
 app.use(express.json());
 
 

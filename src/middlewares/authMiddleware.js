@@ -22,8 +22,8 @@ const verifyToken = (req, res, next) => {
     // 🔐 Verificar token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // 👤 Guardar usuario en request
-    req.user = decoded;
+    // 👤 Guardar usuario en request como id (compatibilidad con payload de JWT)
+    req.user = { id: decoded.id || decoded.user_id || decoded.userId };
 
     next();
 

@@ -1,43 +1,32 @@
 const db = require("../config/db");
 
-exports.getComments = (postId, callback) => {
+exports.getComments = async (postId) => {
   const sql = `
-    SELECT c.id, c.comment, c.created_at AS time, u.nombre
+    SELECT c.id, c.comment, c.created_at AS time, u.nombre AS user
     FROM comments c
     JOIN usuarios u ON c.user_id = u.id
     WHERE c.post_id = ?
     ORDER BY c.created_at ASC
   `;
-  db.query(sql, [postId], (err, results) => {
-    if (err) {
-      console.error("Error getting comments", err);
-      return callback(err);
-    }
-    callback(null, results);
-  });
+  const [rows] = await db.execute(sql, [postId]);
+  return rows.map((row) => ({
+    id: row.id,
+    user: row.user,
+    comment: row.comment,
+    time: row.time,
+  }));
 };
 
-exports.addComment = (userId, postId, comment, callback) => {
+exports.addComment = async (userId, postId, comment) => {
   const sql = `INSERT INTO comments (user_id, post_id, comment) VALUES (?, ?, ?)`;
-  db.query(sql, [userId, postId, comment], (err, result) => {
-    if (err) {
-      console.error("Error adding comment", err);
-      return callback(err);
-    }
+  const [result] = await db.execute(sql, [userId, postId, comment]);
 
-    const selectSql = `
-      SELECT c.id, c.comment, c.created_at AS time, u.nombre
-      FROM comments c
-      JOIN usuarios u ON c.user_id = u.id
-      WHERE c.id = ?
-    `;
-
-    db.query(selectSql, [result.insertId], (selectErr, rows) => {
-      if (selectErr) {
-        console.error("Error fetching new comment", selectErr);
-        return callback(selectErr);
-      }
-      callback(null, rows[0]);
-    });
-  });
+  const selectSql = `
+    SELECT c.id, c.comment, c.created_at AS time, u.nombre AS user
+    FROM comments c
+    JOIN usuarios u ON c.user_id = u.id
+    WHERE c.id = ?
+  `;
+  const [rows] = await db.execute(selectSql, [result.insertId]);
+  return rows[0];
 };
