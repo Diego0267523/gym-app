@@ -24,9 +24,13 @@ exports.createPost = (req, res) => {
         message: "Post creado 🚀"
       });
     });
+    
 
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false });
   }
+};
+exports.getPosts = (req, res) => {
+  res.json({ success: true, message: "Función getPosts aún no implementada" });
 };
