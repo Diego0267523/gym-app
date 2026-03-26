@@ -47,12 +47,16 @@ exports.createPost = (req, res) => {
   }
 };
 exports.getPosts = (req, res) => {
-  postModel.getPosts((err, posts) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const offset = (page - 1) * limit;
+
+  postModel.getPosts(offset, limit, (err, posts) => {
     if (err) {
       console.error(err);
       return res.status(500).json({ success: false, message: "Error obteniendo posts" });
     }
 
-    res.json({ success: true, posts });
+    res.json({ success: true, posts, page, limit });
   });
 };
