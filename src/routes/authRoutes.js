@@ -1,7 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const authController = require("../controllers/authController");
-const verifyToken = require("../middlewares/authMiddleware"); // 👈 IMPORTANTE
+const verifyToken = require("../middlewares/authMiddleware");
+const upload = require("../middlewares/upload");
 
 // ==========================
 // 🔐 AUTH
@@ -19,5 +20,8 @@ router.post("/login", authController.login);
 
 // Obtener datos del usuario logueado
 router.get("/profile", verifyToken, authController.getProfile);
+
+// 📸 Actualizar avatar
+router.put("/avatar", verifyToken, upload.single("avatar"), authController.updateAvatar);
 
 module.exports = router;

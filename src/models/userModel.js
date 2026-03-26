@@ -19,6 +19,7 @@ const getFullProfileById = (userId, callback) => {
             u.id,
             u.nombre,
             u.email,
+            u.avatar,
             p.objetivo,
             p.nivel_actividad AS nivelActividad,
             m.peso,
@@ -134,13 +135,36 @@ const saveHealth = (userId, data, callback) => {
 // ==========================
 
 
+// Actualizar avatar
+const updateAvatar = (userId, avatarUrl, callback) => {
+    const sql = `
+        UPDATE usuarios 
+        SET avatar = ?
+        WHERE id = ?
+    `;
+    db.query(sql, [avatarUrl, userId], callback);
+};
+
+// Obtener avatar de usuario
+const getAvatar = (userId, callback) => {
+    const sql = `SELECT avatar FROM usuarios WHERE id = ?`;
+    db.query(sql, [userId], (err, rows) => {
+        if (err) {
+            return callback(err);
+        }
+        callback(null, rows[0]);
+    });
+};
+
 module.exports = {
     createUser,
     findUserByEmail,
     findUserById,
-    getFullProfileById, // 🔥 AÑADE ESTO
+    getFullProfileById,
     saveMeasurements,
     getMeasurementsByUserId,
     saveProfile,
-    saveHealth
+    saveHealth,
+    updateAvatar,
+    getAvatar
 };

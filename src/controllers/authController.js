@@ -216,3 +216,37 @@ exports.getProfile = (req, res) => {
     });
   }
 };
+
+// ==========================
+// 📸 UPDATE AVATAR
+// ==========================
+exports.updateAvatar = (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const file = req.file;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Usuario no autenticado" });
+    }
+
+    if (!file) {
+      return res.status(400).json({ success: false, message: "Imagen requerida" });
+    }
+
+    const avatar_url = file.secure_url || file.path || file.url;
+    if (!avatar_url) {
+      return res.status(500).json({ success: false, message: "Error al procesar la imagen" });
+    }
+
+    userModel.updateAvatar(userId, avatar_url, (err, result) => {
+      if (err) {
+        console.error("Error updating avatar:", err);
+        return res.status(500).json({ success: false, message: "Error al actualizar avatar" });
+      }
+      return res.json({ success: true, message: "Avatar actualizado", avatar: avatar_url });
+    });
+  } catch (error) {
+    console.error("Error in updateAvatar:", error);
+    return res.status(500).json({ success: false, message: "Error al actualizar avatar" });
+  }
+};

@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const cron = require('node-cron');
+const initDatabase = require("./initDb");
 
 const aiRoutes = require("./routes/aiRoutes");
 const postRoutes = require("./routes/postRoutes");
@@ -12,6 +13,7 @@ const storiesRoutes = require("./routes/storiesRoutes");
 const PORT = process.env.PORT || 10000;
 
 require("./config/db");
+initDatabase(); // 🔥 Inicializar BD
 
 // 🔥 CRON para limpiar historias viejas cada hora
 const storiesModel = require("./models/storiesModel");
