@@ -11,7 +11,7 @@ exports.createPost = (req, res) => {
       });
     }
 
-    const image_url = file.filename; // 🔥 PRO
+    const image_url = req.file.path; // 🔥 URL de cloudinary
 
     postModel.createPost(user_id, image_url, caption, (err) => {
       if (err) {
