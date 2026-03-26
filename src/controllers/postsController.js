@@ -60,6 +60,10 @@ exports.getPosts = (req, res) => {
     }
 
     console.log("Posts fetched:", posts?.length || 0);
-    res.json({ success: true, posts, page, limit });
+    const normalizedPosts = (posts || []).map((post) => ({
+      ...post,
+      nombre: post.nombre || "Usuario"
+    }));
+    res.json({ success: true, posts: normalizedPosts, page, limit });
   });
 };

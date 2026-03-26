@@ -11,9 +11,8 @@ exports.createPost = (user_id, image_url, caption, callback) => {
 
 exports.getPosts = (offset, limit, callback) => {
   const sql = `
-    SELECT posts.*, users.nombre
+    SELECT posts.*
     FROM posts
-    JOIN users ON users.id = posts.user_id
     ORDER BY posts.created_at DESC
     LIMIT ? OFFSET ?
   `;
