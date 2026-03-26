@@ -23,6 +23,16 @@ exports.getComments = (postId, callback) => {
   });
 };
 
+exports.getCommentsCount = (postId, callback) => {
+  const sql = `SELECT COUNT(*) AS count FROM comments WHERE post_id = ?`;
+  db.query(sql, [postId], (err, rows) => {
+    if (err) {
+      return callback(err);
+    }
+    callback(null, rows[0]?.count || 0);
+  });
+};
+
 exports.addComment = (userId, postId, comment, callback) => {
   const sql = `INSERT INTO comments (user_id, post_id, comment) VALUES (?, ?, ?)`;
   db.query(sql, [userId, postId, comment], (err, result) => {

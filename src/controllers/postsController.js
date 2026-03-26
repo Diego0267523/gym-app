@@ -39,13 +39,50 @@ exports.getPosts = (req, res) => {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
     const offset = (page - 1) * limit;
+    const authUserId = req.user?.id || null;
 
-    postModel.getPosts(limit, offset, (err, posts) => {
+    postModel.getPosts(limit, offset, async (err, posts) => {
       if (err) {
         console.error("Error in getPosts:", err);
         return res.status(500).json({ success: false, message: "Error obteniendo posts" });
       }
-      return res.json({ success: true, posts, page, limit });
+
+      try {
+        const enriched = await Promise.all(posts.map((post) => {
+          return new Promise((resolve, reject) => {
+            likesModel.getLikesCount(post.id, (likeErr, likeCount) => {
+              if (likeErr) return reject(likeErr);
+              commentsModel.getCommentsCount(post.id, (commentErr, commentCount) => {
+                if (commentErr) return reject(commentErr);
+                if (authUserId) {
+                  likesModel.isPostLikedByUser(authUserId, post.id, (likedErr, isLiked) => {
+                    if (likedErr) return reject(likedErr);
+                    resolve({
+                      ...post,
+                      likes: likeCount,
+                      commentsCount: commentCount,
+                      liked: isLiked
+                    });
+                  });
+                } else {
+                  resolve({
+                    ...post,
+                    likes: likeCount,
+                    commentsCount: commentCount,
+                    liked: false
+                  });
+                }
+              });
+            });
+          });
+        }));
+
+        return res.json({ success: true, posts: enriched, page, limit });
+      } catch (enrichErr) {
+        console.error("Error enriching posts:", enrichErr);
+        return res.status(500).json({ success: false, message: "Error obteniendo posts" });
+      }
+
     });
   } catch (error) {
     console.error("Error in getPosts:", error);

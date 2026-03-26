@@ -45,6 +45,16 @@ exports.getLikesCount = (postId, callback) => {
   });
 };
 
+exports.isPostLikedByUser = (userId, postId, callback) => {
+  const sql = `SELECT 1 FROM likes WHERE user_id = ? AND post_id = ? LIMIT 1`;
+  db.query(sql, [userId, postId], (err, rows) => {
+    if (err) {
+      return callback(err);
+    }
+    callback(null, rows.length > 0);
+  });
+};
+
 // 🔥 Función auxiliar para crear notificación de like
 const createLikeNotification = (fromUserId, postId, callback) => {
   // Obtener el dueño del post
