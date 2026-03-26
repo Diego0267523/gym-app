@@ -1,4 +1,6 @@
 const postModel = require("../models/postModel");
+const likesModel = require("../models/likesModel");
+const commentsModel = require("../models/commentsModel");
 
 exports.createPost = (req, res) => {
   try {
@@ -65,5 +67,51 @@ exports.getPosts = (req, res) => {
       nombre: post.nombre || "Usuario"
     }));
     res.json({ success: true, posts: normalizedPosts, page, limit });
+  });
+};
+
+exports.toggleLike = (req, res) => {
+  const userId = req.user.id;
+  const postId = parseInt(req.params.id);
+
+  likesModel.toggleLike(userId, postId, (err, likesCount) => {
+    if (err) {
+      console.error("Error toggle like:", err);
+      return res.status(500).json({ success: false, message: "Error toggling like" });
+    }
+
+    res.json({ success: true, data: { postId, likes: likesCount } });
+  });
+};
+
+exports.getComments = (req, res) => {
+  const postId = parseInt(req.params.id);
+
+  commentsModel.getComments(postId, (err, comments) => {
+    if (err) {
+      console.error("Error get comments:", err);
+      return res.status(500).json({ success: false, message: "Error obteniendo comentarios" });
+    }
+
+    res.json({ success: true, data: comments });
+  });
+};
+
+exports.addComment = (req, res) => {
+  const postId = parseInt(req.params.id);
+  const userId = req.user.id;
+  const comment = req.body.comment;
+
+  if (!comment || !comment.trim()) {
+    return res.status(400).json({ success: false, message: "El comentario no puede estar vacío" });
+  }
+
+  commentsModel.addComment(userId, postId, comment, (err, newComment) => {
+    if (err) {
+      console.error("Error add comment:", err);
+      return res.status(500).json({ success: false, message: "Error creando comentario" });
+    }
+
+    res.json({ success: true, data: newComment });
   });
 };

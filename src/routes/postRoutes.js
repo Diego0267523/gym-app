@@ -11,4 +11,11 @@ router.post("/", verifyToken, upload.single("image"), postsController.createPost
 // 🔥 obtener feed
 router.get("/", postsController.getPosts);
 
+// 🔥 toggle like
+router.post("/:id/like", verifyToken, postsController.toggleLike);
+
+// 🔥 comentarios
+router.get("/:id/comments", postsController.getComments);
+router.post("/:id/comments", verifyToken, postsController.addComment);
+
 module.exports = router;
