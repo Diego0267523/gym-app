@@ -6,8 +6,6 @@ exports.createPost = (req, res) => {
     const user_id = req.user.id;
     const file = req.file;
 
-    console.log("📸 Archivo recibido:", JSON.stringify(file, null, 2));
-
     if (!file) {
       return res.status(400).json({
         success: false,
@@ -15,34 +13,27 @@ exports.createPost = (req, res) => {
       });
     }
 
-    // Verificar que existe la URL de Cloudinary
+    // Verificar que existe la URL de Cloudinary o bien la URL de multer-storage
     const image_url = file.secure_url || file.path || file.url;
 
-    console.log("🔗 URL extraída:", image_url);
-
     if (!image_url) {
-      console.error("❌ Error: No se obtuvo URL de imagen", { 
-        secure_url: file.secure_url,
-        path: file.path,
-        url: file.url,
-        allKeys: Object.keys(file)
-      });
+      console.error("Error: No se obtuvo URL de imagen desde Cloudinary", file);
       return res.status(500).json({
         success: false,
         message: "Error al procesar la imagen"
       });
     }
 
-    postModel.createPost(user_id, image_url, caption, (err, result) => {
+    // image_url ya apunta a una URL pública válida
+    postModel.createPost(user_id, image_url, caption, (err) => {
       if (err) {
-        console.error("❌ Error al guardar post en BD:", err);
+        console.error("Error al guardar post en BD:", err);
         return res.status(500).json({ 
           success: false, 
-          message: "Error al guardar el post en BD" 
+          message: "Error al guardar el post" 
         });
       }
 
-      console.log("✅ Post guardado correctamente:", result);
       res.json({
         success: true,
         message: "Post creado 🚀"
@@ -51,7 +42,7 @@ exports.createPost = (req, res) => {
     
 
   } catch (error) {
-    console.error("❌ Error en createPost:", error);
+    console.error("Error en createPost:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
