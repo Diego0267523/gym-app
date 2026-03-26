@@ -1,3 +1,5 @@
+const postModel = require("../models/postModel");
+
 exports.createPost = (req, res) => {
   try {
     const caption = req.body.caption;
@@ -11,7 +13,7 @@ exports.createPost = (req, res) => {
       });
     }
 
-    const image_url = req.file.secure_url; // 🔥 URL de cloudinary
+    const image_url = req.file.secure_url; // URL ya subida a Cloudinary
 
     postModel.createPost(user_id, image_url, caption, (err) => {
       if (err) {
@@ -32,5 +34,12 @@ exports.createPost = (req, res) => {
   }
 };
 exports.getPosts = (req, res) => {
-  res.json({ success: true, message: "Función getPosts aún no implementada" });
+  postModel.getPosts((err, posts) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ success: false, message: "Error obteniendo posts" });
+    }
+
+    res.json({ success: true, posts });
+  });
 };
