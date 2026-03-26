@@ -53,6 +53,12 @@ const findUserById = (id, callback) => {
     db.query(sql, [id], callback);
 };
 
+// Eliminar usuario por ID (para rollback si falla registro)
+const deleteUserById = (id, callback) => {
+    const sql = `DELETE FROM usuarios WHERE id = ?`;
+    db.query(sql, [id], callback);
+};
+
 
 // ==========================
 // 📏 MEDIDAS
@@ -60,8 +66,11 @@ const findUserById = (id, callback) => {
 
 const saveMeasurements = (userId, measurements, callback) => {
     const sql = `
-        INSERT INTO medidas (user_id, peso, altura) 
+        INSERT INTO medidas (user_id, peso, altura)
         VALUES (?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+        peso = VALUES(peso),
+        altura = VALUES(altura)
     `;
     db.query(sql, [
         userId,
@@ -86,9 +95,17 @@ const getMeasurementsByUserId = (userId, callback) => {
 
 const saveProfile = (userId, data, callback) => {
   const sql = `
-    INSERT INTO perfil 
+    INSERT INTO perfil
     (user_id, genero, objetivo, frecuencia, nivel_actividad, tiempo_objetivo, profesion, sueno)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE
+    genero = VALUES(genero),
+    objetivo = VALUES(objetivo),
+    frecuencia = VALUES(frecuencia),
+    nivel_actividad = VALUES(nivel_actividad),
+    tiempo_objetivo = VALUES(tiempo_objetivo),
+    profesion = VALUES(profesion),
+    sueno = VALUES(sueno)
   `;
 
   db.query(sql, [
@@ -116,9 +133,14 @@ const saveProfile = (userId, data, callback) => {
 
 const saveHealth = (userId, data, callback) => {
     const sql = `
-        INSERT INTO salud 
+        INSERT INTO salud
         (user_id, condiciones, medicamentos, lesiones, restricciones)
         VALUES (?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+        condiciones = VALUES(condiciones),
+        medicamentos = VALUES(medicamentos),
+        lesiones = VALUES(lesiones),
+        restricciones = VALUES(restricciones)
     `;
     db.query(sql, [
         userId,
@@ -160,6 +182,7 @@ module.exports = {
     createUser,
     findUserByEmail,
     findUserById,
+    deleteUserById,
     getFullProfileById,
     saveMeasurements,
     getMeasurementsByUserId,
