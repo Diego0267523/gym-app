@@ -9,6 +9,6 @@ const postsController = require("../controllers/postsController");
 router.post("/", verifyToken, upload.single("image"), postsController.createPost);
 
 // 🔥 obtener feed
-router.get("/", verifyToken, postsController.getPosts);
+router.get("/", postsController.getPosts);
 
 module.exports = router;

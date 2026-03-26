@@ -18,5 +18,13 @@ exports.getPosts = (offset, limit, callback) => {
     LIMIT ? OFFSET ?
   `;
 
-  db.query(sql, [limit, offset], callback);
+  console.log("Executing getPosts query:", sql, "Params:", [limit, offset]);
+  db.query(sql, [limit, offset], (err, results) => {
+    if (err) {
+      console.error("DB Error in getPosts:", err);
+      return callback(err);
+    }
+    console.log("DB Results:", results?.length || 0, "rows");
+    callback(null, results);
+  });
 };

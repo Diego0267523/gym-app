@@ -51,12 +51,15 @@ exports.getPosts = (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
   const offset = (page - 1) * limit;
 
+  console.log("Fetching posts - Page:", page, "Limit:", limit, "Offset:", offset, "User:", req.user?.id);
+
   postModel.getPosts(offset, limit, (err, posts) => {
     if (err) {
-      console.error(err);
+      console.error("Error in getPosts:", err);
       return res.status(500).json({ success: false, message: "Error obteniendo posts" });
     }
 
+    console.log("Posts fetched:", posts?.length || 0);
     res.json({ success: true, posts, page, limit });
   });
 };
