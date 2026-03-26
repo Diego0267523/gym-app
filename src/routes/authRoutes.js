@@ -22,6 +22,6 @@ router.post("/login", authController.login);
 router.get("/profile", verifyToken, authController.getProfile);
 
 // 📸 Actualizar avatar
-router.put("/avatar", verifyToken, upload.single("avatar"), authController.updateAvatar);
+router.put("/profile/avatar", verifyToken, upload.single("avatar"), authController.updateAvatar);
 
 module.exports = router;
