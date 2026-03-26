@@ -43,69 +43,94 @@ exports.register = async (req, res) => {
 
           const userId = result.insertId;
 
-          Promise.all([
+          // 🔥 GUARDAR DATOS ADICIONALES (OPCIONALES)
+          const saveAdditionalData = async () => {
+            const promises = [];
 
-            // 📏 MEDIDAS
-            new Promise((resolve, reject) => {
-              if (!peso && !altura) return resolve();
-
-              userModel.saveMeasurements(
-                userId,
-                { peso: peso || null, altura: altura || null },
-                (err) => err ? reject(err) : resolve()
+            // 📏 MEDIDAS (opcional)
+            if (peso || altura) {
+              promises.push(
+                new Promise((resolve) => {
+                  userModel.saveMeasurements(
+                    userId,
+                    { peso: peso || null, altura: altura || null },
+                    (err) => {
+                      if (err) console.warn("⚠️ Error guardando medidas:", err.message);
+                      resolve(); // No fallar por esto
+                    }
+                  );
+                })
               );
-            }),
+            }
 
-            // 🎯 PERFIL (FIX 🔥)
-            new Promise((resolve, reject) => {
-              userModel.saveProfile(
-                userId,
-                {
-                  genero,
-                  objetivo,
-                  frecuencia,
-                  nivelActividad,
-                  tiempoObjetivo,
-                  profesion,
-                  sueno
-                },
-                (err) => {
-                  if (err) {
-                    console.error("💥 ERROR PERFIL:", err);
-                    return reject(err);
-                  }
-                  resolve();
-                }
+            // 🎯 PERFIL (opcional)
+            if (genero || objetivo || frecuencia || nivelActividad || tiempoObjetivo || profesion || sueno) {
+              promises.push(
+                new Promise((resolve) => {
+                  userModel.saveProfile(
+                    userId,
+                    {
+                      genero,
+                      objetivo,
+                      frecuencia,
+                      nivelActividad,
+                      tiempoObjetivo,
+                      profesion,
+                      sueno
+                    },
+                    (err) => {
+                      if (err) console.warn("⚠️ Error guardando perfil:", err.message);
+                      resolve(); // No fallar por esto
+                    }
+                  );
+                })
               );
-            }),
+            }
 
-            // 🏥 SALUD
-            new Promise((resolve, reject) => {
-              userModel.saveHealth(
-                userId,
-                {
-                  condiciones,
-                  medicamentos,
-                  lesiones,
-                  restricciones
-                },
-                (err) => err ? reject(err) : resolve()
+            // 🏥 SALUD (opcional)
+            if (condiciones || medicamentos || lesiones || restricciones) {
+              promises.push(
+                new Promise((resolve) => {
+                  userModel.saveHealth(
+                    userId,
+                    {
+                      condiciones,
+                      medicamentos,
+                      lesiones,
+                      restricciones
+                    },
+                    (err) => {
+                      if (err) console.warn("⚠️ Error guardando salud:", err.message);
+                      resolve(); // No fallar por esto
+                    }
+                  );
+                })
               );
-            })
+            }
 
-          ])
-          .then(() => {
+            // Ejecutar todas las promesas pero no fallar si alguna falla
+            try {
+              await Promise.allSettled(promises);
+              console.log("✅ Datos adicionales guardados (o intentados)");
+            } catch (error) {
+              console.warn("⚠️ Algunos datos adicionales no se guardaron:", error.message);
+            }
+          };
+
+          // Ejecutar guardado de datos adicionales
+          saveAdditionalData().then(() => {
             res.json({
               success: true,
               message: "Usuario registrado correctamente 🚀",
               userId
             });
-          })
-          .catch((error) => {
-            console.error("🔥 ERROR GENERAL:", error);
-            res.status(500).json({
-              success: false,
-              message: "Error guardando datos"
+          }).catch((error) => {
+            console.warn("⚠️ Error en datos adicionales, pero usuario creado:", error.message);
+            // Aún así devolver éxito porque el usuario básico se creó
+            res.json({
+              success: true,
+              message: "Usuario registrado correctamente 🚀",
+              userId
             });
           });
 
