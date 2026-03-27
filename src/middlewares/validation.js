@@ -136,16 +136,16 @@ const loginSchema = Joi.object({
 
 // Schema for registration
 const registerSchema = Joi.object({
-  username: Joi.string()
+  nombre: Joi.string()
     .trim()
     .min(3)
     .max(50)
     .required()
     .messages({
-      'string.empty': 'El nombre de usuario no puede estar vacío',
-      'string.min': 'El nombre de usuario debe tener al menos 3 caracteres',
-      'string.max': 'El nombre de usuario no puede exceder 50 caracteres',
-      'any.required': 'El nombre de usuario es requerido'
+      'string.empty': 'El nombre no puede estar vacío',
+      'string.min': 'El nombre debe tener al menos 3 caracteres',
+      'string.max': 'El nombre no puede exceder 50 caracteres',
+      'any.required': 'El nombre es requerido'
     }),
 
   email: Joi.string()
@@ -162,8 +162,23 @@ const registerSchema = Joi.object({
     .messages({
       'string.min': 'La contraseña debe tener al menos 6 caracteres',
       'any.required': 'La contraseña es requerida'
-    })
-});
+    }),
+
+  // Optional profile fields
+  peso: Joi.number().optional().allow(null),
+  altura: Joi.number().optional().allow(null),
+  genero: Joi.string().optional().allow(null),
+  objetivo: Joi.string().optional().allow(null),
+  frecuencia: Joi.string().optional().allow(null),
+  nivelActividad: Joi.string().optional().allow(null),
+  tiempoObjetivo: Joi.string().optional().allow(null),
+  condiciones: Joi.string().optional().allow(null),
+  medicamentos: Joi.string().optional().allow(null),
+  lesiones: Joi.string().optional().allow(null),
+  restricciones: Joi.string().optional().allow(null),
+  profesion: Joi.string().optional().allow(null),
+  sueno: Joi.string().optional().allow(null)
+}).unknown(false);
 
 // Middleware function to validate request body
 const validate = (schema) => {
