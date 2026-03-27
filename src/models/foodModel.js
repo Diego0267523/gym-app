@@ -66,10 +66,25 @@ const getDailyTotals = (userId, fecha, callback) => {
     db.query(sql, [userId, fecha], callback);
 };
 
+// Obtener totales de calorías de los últimos 7 días (incluye hoy)
+const getWeeklyTotals = (userId, callback) => {
+    const sql = `
+        SELECT
+            fecha,
+            COALESCE(SUM(calorias), 0) AS total_calorias
+        FROM food_entries
+        WHERE user_id = ? AND fecha BETWEEN DATE_SUB(CURDATE(), INTERVAL 6 DAY) AND CURDATE()
+        GROUP BY fecha
+        ORDER BY fecha ASC
+    `;
+    db.query(sql, [userId], callback);
+};
+
 module.exports = {
     createFoodEntry,
     getFoodEntriesByUserAndDate,
     getFoodEntriesByUser,
     deleteFoodEntry,
-    getDailyTotals
+    getDailyTotals,
+    getWeeklyTotals
 };

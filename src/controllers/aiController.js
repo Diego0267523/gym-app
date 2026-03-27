@@ -153,13 +153,45 @@ const cleanCaloriesText = (text) => {
   return null;
 };
 
+const parseJsonFromText = (text) => {
+  if (!text || !text.toString().trim()) return null;
+
+  // Intentar extraer primario JSON bloqueado por texto
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return null;
+
+  try {
+    const cleaned = jsonMatch[0];
+    const parsed = JSON.parse(cleaned);
+    return parsed;
+  } catch (err) {
+    // Fallback: intentar con reemplazos simples de comillas erróneas
+    try {
+      const fallback = jsonMatch[0]
+        .replace(/\b([a-zA-Z0-9_]+)\s*:/g, '"$1":')
+        .replace(/'/g, '"');
+      return JSON.parse(fallback);
+    } catch (err2) {
+      return null;
+    }
+  }
+};
+
 const requestCaloriesByAI = async (promptMessage) => {
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
   const result = await model.generateContent(promptMessage);
   const outputText = safeText(result);
-  const parsed = parseCaloriesFromText(outputText);
-  const macros = parseMacrosFromText(outputText);
-  return { outputText, parsed, macros };
+
+  const aiJson = parseJsonFromText(outputText);
+
+  // Mantener respaldo de parseo viejo si JSON no llega o está malo
+  const parsed = aiJson?.total?.calorias || parseCaloriesFromText(outputText);
+  const macros = {
+    proteina: aiJson?.total?.proteina || parseMacrosFromText(outputText).proteina,
+    carbohidratos: aiJson?.total?.carbohidratos || parseMacrosFromText(outputText).carbohidratos
+  };
+
+  return { outputText, parsed, macros, aiJson };
 };
 
 // Nuevo endpoint: conteo de calorías por texto / imagen
@@ -187,18 +219,32 @@ exports.countCalories = async (req, res) => {
         return res.json(result);
       }
 
-      const prompt = `Estimame las calorías de esta descripción de comida (si no puedes precisar, da un rango y explica): ${text}`;
+      const prompt = `Eres un nutricionista. Dada la siguiente descripción de comida, responde ÚNICAMENTE con JSON válido (nada más) en este formato:\n` +
+        `{"items":[{"nombre":"...","calorias":number,"proteina":number,"carbohidratos":number}],"total":{"calorias":number,"proteina":number,"carbohidratos":number},"comentario":"..."}\n` +
+        `Si no estás seguro, deja valor como null. Evita explicaciones adicionales. \nDescripción: ${text}`;
+
       const ai = await requestCaloriesByAI(prompt);
       result = {
         ...result,
         calories: ai.parsed || null,
+        proteina: ai.macros?.proteina || null,
+        carbohidratos: ai.macros?.carbohidratos || null,
         source: "text_ai",
-        details: { text, aiText: ai.outputText }
+        details: { text, aiText: ai.outputText, aiJson: ai.aiJson }
       };
+
+      if (ai.aiJson?.total) {
+        result.calories = ai.aiJson.total.calorias || result.calories;
+        result.proteina = ai.aiJson.total.proteina || result.proteina;
+        result.carbohidratos = ai.aiJson.total.carbohidratos || result.carbohidratos;
+      }
     }
 
     if (imageUrl) {
-      const prompt = `Analiza esta imagen de comida (URL: ${imageUrl}) y estima calorías totales aproximadas. Indica qué platos ves y cuántas calorías estimas, proteína y carbohidratos.`;
+      const prompt = `Eres un nutricionista. Analiza esta comida desde la imagen y responde ÚNICAMENTE en JSON con el formato:\n` +
+        `{"items":[{"nombre":"...","calorias":number,"proteina":number,"carbohidratos":number}],"total":{"calorias":number,"proteina":number,"carbohidratos":number},"comentario":"..."}\n` +
+        `URL: ${imageUrl}`;
+
       const ai = await requestCaloriesByAI(prompt);
 
       if (!result.calories && ai.parsed) {
@@ -211,9 +257,16 @@ exports.countCalories = async (req, res) => {
       result.details.imageUrl = imageUrl;
       result.details.imageAiText = ai.outputText;
       result.details.imageMacros = ai.macros;
+      result.details.imageAiJson = ai.aiJson;
 
-      if (!result.proteina && ai.macros?.proteina) result.proteina = ai.macros.proteina;
-      if (!result.carbohidratos && ai.macros?.carbohidratos) result.carbohidratos = ai.macros.carbohidratos;
+      if (ai.aiJson?.total) {
+        result.calories = ai.aiJson.total.calorias || result.calories;
+        result.proteina = ai.aiJson.total.proteina || result.proteina;
+        result.carbohidratos = ai.aiJson.total.carbohidratos || result.carbohidratos;
+      } else {
+        if (!result.proteina && ai.macros?.proteina) result.proteina = ai.macros.proteina;
+        if (!result.carbohidratos && ai.macros?.carbohidratos) result.carbohidratos = ai.macros.carbohidratos;
+      }
     }
 
     // Si se tiene texto y no macros aún, intentar extraer del texto

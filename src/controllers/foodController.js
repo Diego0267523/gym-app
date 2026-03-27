@@ -104,6 +104,40 @@ exports.getDailyTotals = (req, res) => {
   }
 };
 
+// Obtener totales de la semana
+exports.getWeeklyTotals = (req, res) => {
+  try {
+    const user_id = req.user?.id;
+    if (!user_id) {
+      return res.status(401).json({ success: false, message: "Usuario no autenticado" });
+    }
+
+    foodModel.getWeeklyTotals(user_id, (err, results) => {
+      if (err) {
+        logger.error("Error en getWeeklyTotals:", { error: err.message, user_id });
+        return res.status(500).json({ success: false, message: "Error al obtener totales semanales" });
+      }
+
+      // Generar los 7 días incluso si no hay datos para algunos
+      const today = new Date();
+      const week = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        const day = d.toISOString().split('T')[0];
+        const item = results.find(r => r.fecha === day);
+        week.push({ fecha: day, total_calorias: item ? Number(item.total_calorias) : 0 });
+      }
+
+      logger.info("Totales semanales obtenidos", { user_id, week });
+      return res.json({ success: true, week });
+    });
+  } catch (error) {
+    logger.error("Error en getWeeklyTotals:", { error: error.message, stack: error.stack, user_id: req.user?.id });
+    return res.status(500).json({ success: false, message: "Error interno del servidor" });
+  }
+};
+
 // Eliminar entrada de comida
 exports.deleteFoodEntry = (req, res) => {
   try {

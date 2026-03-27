@@ -18,6 +18,9 @@ router.get("/entries", verifyToken, foodController.getFoodEntries);
 // Obtener totales diarios
 router.get("/totals", verifyToken, foodController.getDailyTotals);
 
+// Obtener totales de la semana
+router.get("/weekly-totals", verifyToken, foodController.getWeeklyTotals);
+
 // Eliminar entrada de comida
 router.delete("/entries/:id", verifyToken, foodController.deleteFoodEntry);
 
