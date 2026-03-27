@@ -47,7 +47,6 @@ const allowedOrigins = [
   "http://localhost:3000"
 ];
 
-// 🔥 CORS PRIMERO (antes del rate limiter)
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
@@ -60,9 +59,6 @@ app.use(cors({
   credentials: true,
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
-
-// 🔥 MANEJO EXPLÍCITO DE OPTIONS (preflight)
-app.options("*", cors());
 
 // Security middlewares
 app.use(helmet({
@@ -77,24 +73,13 @@ app.use(helmet({
     },
   },
 }));
+app.use(apiLimiter);
 
-// 🔥 Logging middleware ANTES del rate limiter
+// Logging middleware
 app.use((req, res, next) => {
   logger.http(`${req.method} ${req.url} - ${req.ip}`);
   next();
 });
-
-// 🔥 Rate limiter DESPUÉS de CORS y Logging, pero SOLO para non-OPTIONS
-// 🔥 EN DESARROLLO: DESHABILITADO PARA TESTING
-if (process.env.NODE_ENV !== "development") {
-  app.use((req, res, next) => {
-    // Excluir preflight requests del rate limiter
-    if (req.method === "OPTIONS") {
-      return next();
-    }
-    apiLimiter(req, res, next);
-  });
-}
 
 app.use(express.json());
 app.use(express.urlencoded({ limit: '10mb', extended: true }));

@@ -3,42 +3,25 @@ const rateLimit = require('express-rate-limit');
 // General API rate limiter
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 500, // Permisivo en desarrollo: 500 requests en 15 min
+  max: 100, // Limit each IP to 100 requests per windowMs
   message: {
     success: false,
     message: 'Demasiadas solicitudes desde esta IP, por favor intenta más tarde.'
   },
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req, res) => {
-    // Skip rate limit para métodos seguros + health checks
-    if (req.method === "OPTIONS" || req.path === "/health" || req.path === "/status") {
-      return true;
-    }
-    // Por defecto: SALTEAR - Cambiar en producción si es necesario
-    return true;
-  }
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
 });
 
 // Stricter limiter for authentication endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Muy permisivo: 100 intentos en 15 min
+  max: 5, // Limit each IP to 5 login attempts per windowMs
   message: {
     success: false,
     message: 'Demasiados intentos de login desde esta IP, por favor intenta más tarde.'
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req, res) => {
-    // Skip rate limit para OPTIONS/preflight
-    if (req.method === "OPTIONS") {
-      return true;
-    }
-    // Por defecto: SALTEAR (permitir) - Cambiar a false en PRODUCCIÓN SOLO si es necesario
-    // TODO: En producción futura, cambiar a: return process.env.NODE_ENV === "production"
-    return true;
-  }
 });
 
 // Limiter for AI endpoints (expensive operations)
