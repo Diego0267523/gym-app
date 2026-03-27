@@ -22,7 +22,7 @@ const apiLimiter = rateLimit({
 // Stricter limiter for authentication endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 30, // Permisivo: 30 intentos en 15 min (permite reintentos + pruebas)
+  max: 100, // Muy permisivo: 100 intentos en 15 min
   message: {
     success: false,
     message: 'Demasiados intentos de login desde esta IP, por favor intenta más tarde.'
@@ -32,6 +32,10 @@ const authLimiter = rateLimit({
   skip: (req, res) => {
     // Skip rate limit para OPTIONS/preflight
     if (req.method === "OPTIONS") {
+      return true;
+    }
+    // En desarrollo, skip auth limiter completamente
+    if (process.env.NODE_ENV === "development") {
       return true;
     }
     return false;
