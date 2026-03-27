@@ -106,6 +106,136 @@ exports.chatAssistant = async (req, res) => {
   }
 };
 
+// Helper de parseo simple
+const parseCaloriesFromText = (text) => {
+  if (!text || !text.toString().trim()) {
+    return null;
+  }
+
+  const normalized = text.toString();
+  const match = normalized.match(/(\d+[\.,]?\d*)\s*(kcal|cal)/i);
+  if (match) {
+    const value = parseFloat(match[1].replace(',', '.'));
+    return Number.isFinite(value) ? value : null;
+  }
+
+  return null;
+};
+
+const parseMacrosFromText = (text) => {
+  if (!text || !text.toString().trim()) {
+    return { proteina: null, carbohidratos: null };
+  }
+
+  const normalized = text.toString();
+  const macros = { proteina: null, carbohidratos: null };
+
+  const regexList = [
+    { key: 'proteina', re: /(\d+[\.,]?\d*)\s*(g|gr|gramos)\s*(proteína|proteinas|protein)/i },
+    { key: 'carbohidratos', re: /(\d+[\.,]?\d*)\s*(g|gr|gramos)\s*(carbohidratos|carbs|carbohidrato)/i },
+  ];
+
+  for (const item of regexList) {
+    const match = normalized.match(item.re);
+    if (match) {
+      const value = parseFloat(match[1].replace(',', '.'));
+      if (Number.isFinite(value)) macros[item.key] = value;
+    }
+  }
+
+  return macros;
+};
+
+const cleanCaloriesText = (text) => {
+  if (!text || !text.trim()) return null;
+  const parsed = parseCaloriesFromText(text);
+  if (parsed !== null) return parsed;
+  return null;
+};
+
+const requestCaloriesByAI = async (promptMessage) => {
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const result = await model.generateContent(promptMessage);
+  const outputText = safeText(result);
+  const parsed = parseCaloriesFromText(outputText);
+  const macros = parseMacrosFromText(outputText);
+  return { outputText, parsed, macros };
+};
+
+// Nuevo endpoint: conteo de calorías por texto / imagen
+exports.countCalories = async (req, res) => {
+  try {
+    const { text } = req.body;
+    let imageUrl = req.body.imageUrl;
+    if (req.file && req.file.secure_url) {
+      imageUrl = req.file.secure_url;
+    }
+
+    if (!text && !imageUrl) {
+      return res.status(400).json({ success: false, message: "Debes enviar text o imageUrl (o subir image)" });
+    }
+
+    let result = { success: true, calories: null, proteina: null, carbohidratos: null, source: null, details: {} };
+
+    if (text) {
+      const parsed = cleanCaloriesText(text);
+      if (parsed !== null) {
+        result = { ...result, calories: parsed, source: "text_regex", details: { text } };
+        return res.json(result);
+      }
+
+      const prompt = `Estimame las calorías de esta descripción de comida (si no puedes precisar, da un rango y explica): ${text}`;
+      const ai = await requestCaloriesByAI(prompt);
+      result = {
+        ...result,
+        calories: ai.parsed || null,
+        source: "text_ai",
+        details: { text, aiText: ai.outputText }
+      };
+    }
+
+    if (imageUrl) {
+      const prompt = `Analiza esta imagen de comida (URL: ${imageUrl}) y estima calorías totales aproximadas. Indica qué platos ves y cuántas calorías estimas, proteína y carbohidratos.`;
+      const ai = await requestCaloriesByAI(prompt);
+
+      if (!result.calories && ai.parsed) {
+        result.calories = ai.parsed;
+        result.source = "image_ai";
+      } else if (!result.calories) {
+        result.source = "image_ai";
+      }
+
+      result.details.imageUrl = imageUrl;
+      result.details.imageAiText = ai.outputText;
+      result.details.imageMacros = ai.macros;
+
+      if (!result.proteina && ai.macros?.proteina) result.proteina = ai.macros.proteina;
+      if (!result.carbohidratos && ai.macros?.carbohidratos) result.carbohidratos = ai.macros.carbohidratos;
+    }
+
+    // Si se tiene texto y no macros aún, intentar extraer del texto
+    if (!result.proteina && text) {
+      const parsedTextMacros = parseMacrosFromText(text);
+      if (parsedTextMacros.proteina) result.proteina = parsedTextMacros.proteina;
+      if (parsedTextMacros.carbohidratos) result.carbohidratos = parsedTextMacros.carbohidratos;
+    }
+
+    if (!result.carbohidratos && text) {
+      const parsedTextMacros = parseMacrosFromText(text);
+      if (parsedTextMacros.carbohidratos) result.carbohidratos = parsedTextMacros.carbohidratos;
+    }
+
+    if (!result.calories) {
+      result.note = "No se pudo extraer un valor numérico exacto, revisa el campo details.aiText.";
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.log("🔥 ERROR IA CALORIAS:", error);
+    return res.status(500).json({ message: "Error calculando calorías", error: error.message });
+  }
+};
+
 // 🔥 Controlador para generar rutinas (opcional)
 exports.generateRoutine = async (req, res) => {
   try {

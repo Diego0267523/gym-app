@@ -34,56 +34,96 @@ exports.createPost = (req, res) => {
   }
 };
 
-exports.getPosts = (req, res) => {
+const fetchPosts = (limit, offset) => {
+  return new Promise((resolve, reject) => {
+    postModel.getPosts(limit, offset, (err, posts) => {
+      if (err) return reject(err);
+      resolve(posts);
+    });
+  });
+};
+
+const fetchPostsWithRetry = async (limit, offset, maxAttempts = 2) => {
+  let attempt = 0;
+  while (attempt < maxAttempts) {
+    attempt++;
+    try {
+      const posts = await fetchPosts(limit, offset);
+      return posts;
+    } catch (error) {
+      console.warn(`Intento ${attempt} getPosts falló:`, error.message);
+      if (attempt >= maxAttempts) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+};
+
+exports.getPosts = async (req, res) => {
   try {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
     const offset = (page - 1) * limit;
     const authUserId = req.user?.id || null;
 
-    postModel.getPosts(limit, offset, async (err, posts) => {
-      if (err) {
-        console.error("Error in getPosts:", err);
-        return res.status(500).json({ success: false, message: "Error obteniendo posts" });
-      }
+    let posts;
+    try {
+      posts = await fetchPostsWithRetry(limit, offset, 2);
+    } catch (err) {
+      console.error("getPosts total failed after retry:", err);
+      return res.status(500).json({ success: false, message: "Error obteniendo posts" });
+    }
 
-      try {
-        const enriched = await Promise.all(posts.map((post) => {
-          return new Promise((resolve, reject) => {
-            likesModel.getLikesCount(post.id, (likeErr, likeCount) => {
+    const safePosts = Array.isArray(posts) ? posts : [];
+
+    try {
+      const enriched = await Promise.all(safePosts.map(async (post) => {
+        try {
+          const likeCount = await new Promise((resolve, reject) => {
+            likesModel.getLikesCount(post.id, (likeErr, likeCountResult) => {
               if (likeErr) return reject(likeErr);
-              commentsModel.getCommentsCount(post.id, (commentErr, commentCount) => {
-                if (commentErr) return reject(commentErr);
-                if (authUserId) {
-                  likesModel.isPostLikedByUser(authUserId, post.id, (likedErr, isLiked) => {
-                    if (likedErr) return reject(likedErr);
-                    resolve({
-                      ...post,
-                      likes: likeCount,
-                      commentsCount: commentCount,
-                      liked: isLiked
-                    });
-                  });
-                } else {
-                  resolve({
-                    ...post,
-                    likes: likeCount,
-                    commentsCount: commentCount,
-                    liked: false
-                  });
-                }
-              });
+              resolve(likeCountResult || 0);
             });
           });
-        }));
 
-        return res.json({ success: true, posts: enriched, page, limit });
-      } catch (enrichErr) {
-        console.error("Error enriching posts:", enrichErr);
-        return res.status(500).json({ success: false, message: "Error obteniendo posts" });
-      }
+          const commentCount = await new Promise((resolve, reject) => {
+            commentsModel.getCommentsCount(post.id, (commentErr, commentCountResult) => {
+              if (commentErr) return reject(commentErr);
+              resolve(commentCountResult || 0);
+            });
+          });
 
-    });
+          let isLiked = false;
+          if (authUserId) {
+            isLiked = await new Promise((resolve, reject) => {
+              likesModel.isPostLikedByUser(authUserId, post.id, (likedErr, likedResult) => {
+                if (likedErr) return reject(likedErr);
+                resolve(Boolean(likedResult));
+              });
+            });
+          }
+
+          return {
+            ...post,
+            likes: likeCount,
+            commentsCount: commentCount,
+            liked: isLiked,
+          };
+        } catch (itemErr) {
+          console.error(`Error enriching post ${post.id}:`, itemErr);
+          return {
+            ...post,
+            likes: 0,
+            commentsCount: 0,
+            liked: false,
+          };
+        }
+      }));
+
+      return res.json({ success: true, posts: enriched, page, limit });
+    } catch (enrichErr) {
+      console.error("Error enriching posts:", enrichErr);
+      return res.status(500).json({ success: false, message: "Error obteniendo posts" });
+    }
   } catch (error) {
     console.error("Error in getPosts:", error);
     return res.status(500).json({ success: false, message: "Error obteniendo posts" });

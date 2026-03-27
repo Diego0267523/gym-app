@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const cron = require('node-cron');
 const initDatabase = require("./initDb");
+const db = require("./config/db");
 
 const aiRoutes = require("./routes/aiRoutes");
 const postRoutes = require("./routes/postRoutes");
@@ -69,6 +70,30 @@ app.use("/uploads", express.static("uploads"));
 // Health check
 app.get("/health", (req, res) => {
   res.json({ status: "ok", message: "Servidor corriendo" });
+});
+
+// DB status endpoint
+app.get("/status", (req, res) => {
+  db.query("SELECT 1 + 1 AS value", (err, results) => {
+    if (err) {
+      console.error("DB health check falló:", err);
+      return res.status(500).json({ status: "error", message: "DB no disponible" });
+    }
+    return res.json({ status: "ok", db: "available", value: results[0].value });
+  });
+});
+
+// Middleware global para errores no capturados (no explota el server)
+app.use((err, req, res, next) => {
+  console.error("Unhandled error:", err);
+  if (res.headersSent) {
+    return next(err);
+  }
+
+  res.status(500).json({
+    success: false,
+    message: "Error interno del servidor. Intente nuevamente más tarde."
+  });
 });
 
 app.listen(PORT, () => {
