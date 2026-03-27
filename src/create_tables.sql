@@ -129,3 +129,18 @@ ALTER TABLE perfil MODIFY COLUMN tiempo_objetivo VARCHAR(50);
 
 -- Corregir tipo de columna sueno si es necesario
 ALTER TABLE perfil MODIFY COLUMN sueno VARCHAR(50);
+
+-- Crear tabla food_entries si no existe
+CREATE TABLE IF NOT EXISTS food_entries (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    fecha DATE NOT NULL DEFAULT (CURRENT_DATE),
+    descripcion TEXT,
+    calorias DECIMAL(7,2) DEFAULT 0,
+    proteina DECIMAL(6,2) DEFAULT 0,
+    carbohidratos DECIMAL(6,2) DEFAULT 0,
+    image_url VARCHAR(500),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    INDEX idx_user_fecha (user_id, fecha)
+);

@@ -1,17 +1,21 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
 const cron = require('node-cron');
 const initDatabase = require("./initDb");
 const db = require("./config/db");
+const logger = require("./config/logger");
+const { apiLimiter } = require("./middlewares/rateLimiter");
 
 const aiRoutes = require("./routes/aiRoutes");
 const postRoutes = require("./routes/postRoutes");
 const authRoutes = require("./routes/authRoutes");
 const trainingRoutes = require("./routes/trainingRoutes");
 const storiesRoutes = require("./routes/storiesRoutes");
+const foodRoutes = require("./routes/foodRoutes");
 
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 9090;
 
 require("./config/db");
 initDatabase(); // 🔥 Inicializar BD
@@ -56,6 +60,27 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
+// Security middlewares
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:", "http:"],
+      scriptSrc: ["'self'"],
+      connectSrc: ["'self'", "https://api.cloudinary.com"],
+    },
+  },
+}));
+app.use(apiLimiter);
+
+// Logging middleware
+app.use((req, res, next) => {
+  logger.http(`${req.method} ${req.url} - ${req.ip}`);
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
@@ -65,6 +90,7 @@ app.use("/api/training", trainingRoutes);
 app.use("/api/stories", storiesRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/posts", postRoutes);
+app.use("/api/food", foodRoutes);
 app.use("/uploads", express.static("uploads"));
 
 // Health check
@@ -85,7 +111,7 @@ app.get("/status", (req, res) => {
 
 // Middleware global para errores no capturados (no explota el server)
 app.use((err, req, res, next) => {
-  console.error("Unhandled error:", err);
+  logger.error(`Unhandled error: ${err.message}`, { stack: err.stack, url: req.url, method: req.method, ip: req.ip });
   if (res.headersSent) {
     return next(err);
   }
