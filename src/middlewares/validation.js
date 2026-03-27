@@ -167,17 +167,17 @@ const registerSchema = Joi.object({
   // Optional profile fields
   peso: Joi.number().optional().allow(null),
   altura: Joi.number().optional().allow(null),
-  genero: Joi.string().optional().allow(null),
-  objetivo: Joi.string().optional().allow(null),
-  frecuencia: Joi.string().optional().allow(null),
-  nivelActividad: Joi.string().optional().allow(null),
-  tiempoObjetivo: Joi.string().optional().allow(null),
-  condiciones: Joi.string().optional().allow(null),
-  medicamentos: Joi.string().optional().allow(null),
-  lesiones: Joi.string().optional().allow(null),
-  restricciones: Joi.string().optional().allow(null),
-  profesion: Joi.string().optional().allow(null),
-  sueno: Joi.string().optional().allow(null)
+  genero: Joi.string().optional().allow(null, ''),
+  objetivo: Joi.string().optional().allow(null, ''),
+  frecuencia: Joi.string().optional().allow(null, ''),
+  nivelActividad: Joi.string().optional().allow(null, ''),
+  tiempoObjetivo: Joi.string().optional().allow(null, ''),
+  condiciones: Joi.string().optional().allow(null, ''),
+  medicamentos: Joi.string().optional().allow(null, ''),
+  lesiones: Joi.string().optional().allow(null, ''),
+  restricciones: Joi.string().optional().allow(null, ''),
+  profesion: Joi.string().optional().allow(null, ''),
+  sueno: Joi.string().optional().allow(null, '')
 }).unknown(false);
 
 // Middleware function to validate request body
