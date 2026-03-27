@@ -15,7 +15,8 @@ const apiLimiter = rateLimit({
     if (req.method === "OPTIONS" || req.path === "/health" || req.path === "/status") {
       return true;
     }
-    return false;
+    // Por defecto: SALTEAR - Cambiar en producción si es necesario
+    return true;
   }
 });
 
@@ -34,11 +35,9 @@ const authLimiter = rateLimit({
     if (req.method === "OPTIONS") {
       return true;
     }
-    // En desarrollo, skip auth limiter completamente
-    if (process.env.NODE_ENV === "development") {
-      return true;
-    }
-    return false;
+    // Por defecto: SALTEAR (permitir) - Cambiar a false en PRODUCCIÓN SOLO si es necesario
+    // TODO: En producción futura, cambiar a: return process.env.NODE_ENV === "production"
+    return true;
   }
 });
 
