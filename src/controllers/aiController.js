@@ -167,8 +167,11 @@ exports.countCalories = async (req, res) => {
   try {
     const { text } = req.body;
     let imageUrl = req.body.imageUrl;
-    if (req.file && req.file.secure_url) {
-      imageUrl = req.file.secure_url;
+
+    console.log("[countCalories] req.file:", req.file);
+
+    if (req.file) {
+      imageUrl = req.file.secure_url || req.file.path || req.file.url;
     }
 
     if (!text && !imageUrl) {
