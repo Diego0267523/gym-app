@@ -22,6 +22,35 @@ const createFoodEntry = (entry, callback) => {
     db.query(sql, values, callback);
 };
 
+// Crear múltiples entradas de comida (bulk)
+const createFoodEntriesBulk = (entries, callback) => {
+    if (!entries || entries.length === 0) {
+        return callback(null, { affectedRows: 0, insertId: null });
+    }
+
+    const placeholders = entries.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ');
+    const values = [];
+
+    entries.forEach(entry => {
+      values.push(
+        entry.user_id,
+        entry.fecha || new Date().toISOString().split('T')[0],
+        entry.descripcion,
+        entry.calorias || 0,
+        entry.proteina || 0,
+        entry.carbohidratos || 0,
+        entry.image_url || null
+      );
+    });
+
+    const sql = `
+        INSERT INTO food_entries (user_id, fecha, descripcion, calorias, proteina, carbohidratos, image_url)
+        VALUES ${placeholders}
+    `;
+
+    db.query(sql, values, callback);
+};
+
 // Obtener entradas de comida por usuario y fecha (día específico)
 const getFoodEntriesByUserAndDate = (userId, fecha, callback) => {
     const sql = `
@@ -82,6 +111,7 @@ const getWeeklyTotals = (userId, callback) => {
 
 module.exports = {
     createFoodEntry,
+    createFoodEntriesBulk,
     getFoodEntriesByUserAndDate,
     getFoodEntriesByUser,
     deleteFoodEntry,

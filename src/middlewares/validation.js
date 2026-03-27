@@ -44,8 +44,23 @@ const createFoodEntrySchema = Joi.object({
     .optional()
     .messages({
       'string.pattern.base': 'La fecha debe tener formato YYYY-MM-DD'
-    })
-}).or('descripcion', 'calorias', 'proteina', 'carbohidratos')
+    }),
+  aiJson: Joi.object({
+    items: Joi.array().items(
+      Joi.object({
+        nombre: Joi.string().trim().max(200).required(),
+        calorias: Joi.number().min(0).max(10000).required(),
+        proteina: Joi.number().min(0).max(1000).required(),
+        carbohidratos: Joi.number().min(0).max(1000).required()
+      })
+    ).required(),
+    total: Joi.object({
+      calorias: Joi.number().min(0).max(10000).required(),
+      proteina: Joi.number().min(0).max(1000).required(),
+      carbohidratos: Joi.number().min(0).max(1000).required()
+    }).optional()
+  }).optional()
+}).or('descripcion', 'calorias', 'proteina', 'carbohidratos', 'aiJson')
 .messages({
   'object.missing': 'Debe proporcionar al menos descripción o valores nutricionales'
 });

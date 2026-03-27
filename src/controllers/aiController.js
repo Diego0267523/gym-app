@@ -177,21 +177,99 @@ const parseJsonFromText = (text) => {
   }
 };
 
+const parseFoodItemsFromText = (text) => {
+  if (!text || !text.toString().trim()) return null;
+
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const items = [];
+  let current = null;
+
+  const pushCurrent = () => {
+    if (current && current.nombre) {
+      current.calorias = Number(current.calorias || 0);
+      current.proteina = Number(current.proteina || 0);
+      current.carbohidratos = Number(current.carbohidratos || 0);
+      items.push(current);
+    }
+    current = null;
+  };
+
+  for (const line of lines) {
+    const calMatch = line.match(/calor[ií]as?\s*:\s*(\d+[\.,]?\d*)/i);
+    const proMatch = line.match(/prote[ií]na?\s*:\s*(\d+[\.,]?\d*)/i);
+    const carbMatch = line.match(/carbohidratos?\s*:\s*(\d+[\.,]?\d*)/i);
+
+    if (!calMatch && !proMatch && !carbMatch) {
+      // Texto de nombre de alimento
+      // Si ya hay current item, guardalo y comienza uno nuevo
+      if (current && current.calorias !== undefined) {
+        pushCurrent();
+      }
+      current = { nombre: line, calorias: null, proteina: null, carbohidratos: null };
+      continue;
+    }
+
+    if (!current) {
+      current = { nombre: 'Desconocido', calorias: null, proteina: null, carbohidratos: null };
+    }
+
+    if (calMatch) {
+      current.calorias = Number(calMatch[1].replace(',', '.'));
+    }
+    if (proMatch) {
+      current.proteina = Number(proMatch[1].replace(',', '.'));
+    }
+    if (carbMatch) {
+      current.carbohidratos = Number(carbMatch[1].replace(',', '.'));
+    }
+  }
+
+  pushCurrent();
+
+  if (items.length === 0) return null;
+
+  const total = items.reduce(
+    (acc, item) => ({
+      calorias: acc.calorias + (Number.isFinite(item.calorias) ? item.calorias : 0),
+      proteina: acc.proteina + (Number.isFinite(item.proteina) ? item.proteina : 0),
+      carbohidratos: acc.carbohidratos + (Number.isFinite(item.carbohidratos) ? item.carbohidratos : 0)
+    }),
+    { calorias: 0, proteina: 0, carbohidratos: 0 }
+  );
+
+  return { items, total };
+};
+
 const requestCaloriesByAI = async (promptMessage) => {
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
   const result = await model.generateContent(promptMessage);
   const outputText = safeText(result);
 
-  const aiJson = parseJsonFromText(outputText);
+  let aiJson = parseJsonFromText(outputText);
+  let mealPlan = null;
 
-  // Mantener respaldo de parseo viejo si JSON no llega o está malo
-  const parsed = aiJson?.total?.calorias || parseCaloriesFromText(outputText);
+  if (!aiJson) {
+    mealPlan = parseFoodItemsFromText(outputText);
+    aiJson = mealPlan;
+  }
+
+  const parsed =
+    aiJson?.total?.calorias ||
+    (mealPlan ? mealPlan.total.calorias : null) ||
+    parseCaloriesFromText(outputText);
+
+  const macrosFromText = parseMacrosFromText(outputText);
+
   const macros = {
-    proteina: aiJson?.total?.proteina || parseMacrosFromText(outputText).proteina,
-    carbohidratos: aiJson?.total?.carbohidratos || parseMacrosFromText(outputText).carbohidratos
+    proteina:
+      aiJson?.total?.proteina || (mealPlan ? mealPlan.total.proteina : null) || macrosFromText.proteina,
+    carbohidratos:
+      aiJson?.total?.carbohidratos || (mealPlan ? mealPlan.total.carbohidratos : null) || macrosFromText.carbohidratos
   };
 
-  return { outputText, parsed, macros, aiJson };
+  const items = aiJson?.items || (mealPlan ? mealPlan.items : null);
+
+  return { outputText, parsed, macros, aiJson, items };
 };
 
 // Nuevo endpoint: conteo de calorías por texto / imagen

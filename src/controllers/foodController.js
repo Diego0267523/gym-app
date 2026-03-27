@@ -15,7 +15,42 @@ exports.createFoodEntry = (req, res) => {
     }
 
     const { descripcion, calorias, proteina, carbohidratos, fecha } = req.body;
+    let { aiJson } = req.body;
     const image_url = req.file ? (req.file.secure_url || req.file.path || req.file.url) : null;
+
+    if (typeof aiJson === 'string') {
+      try {
+        aiJson = JSON.parse(aiJson);
+      } catch (e) {
+        aiJson = null;
+      }
+    }
+
+    // 🔥 Si el payload trae items de IA, guardamos todos ellos (bulk) para evitar invalid datos.
+    if (aiJson && aiJson.items && Array.isArray(aiJson.items) && aiJson.items.length > 0) {
+      const entries = aiJson.items.map(item => ({
+        user_id,
+        descripcion: item.nombre || descripcion || 'Comida de IA',
+        calorias: Number(item.calorias || 0),
+        proteina: Number(item.proteina || 0),
+        carbohidratos: Number(item.carbohidratos || 0),
+        fecha: fecha || new Date().toISOString().split('T')[0],
+        image_url
+      })).filter(e => e.calorias > 0 || e.proteina > 0 || e.carbohidratos > 0 || e.descripcion);
+
+      if (entries.length === 0) {
+        return res.status(400).json({ success: false, message: "No hay valores nutricionales válidos en aiJson" });
+      }
+
+      return foodModel.createFoodEntriesBulk(entries, (err, result) => {
+        if (err) {
+          logger.error("Error en createFoodEntriesBulk:", { error: err.message, user_id, aiJson });
+          return res.status(500).json({ success: false, message: "Error al guardar entradas de comida" });
+        }
+        logger.info("Entradas de comida bulk creadas", { user_id, entries: entries.length });
+        return res.json({ success: true, message: "Entradas de comida guardadas (bulk)", insertedCount: entries.length });
+      });
+    }
 
     // 🔥 OPTIMIZACIÓN: Comprimir imagen si existe
     if (req.file && req.file.buffer) {
