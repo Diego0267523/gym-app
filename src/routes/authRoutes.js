@@ -18,6 +18,12 @@ router.post("/register", authLimiter, validate(registerSchema), authController.r
 router.post("/login", authLimiter, validate(loginSchema), authController.login);
 
 // ==========================
+// 🧪 TEST ROUTES (SIN RATE LIMITER)
+// ==========================
+router.post("/test/register", validate(registerSchema), authController.register);
+router.post("/test/login", validate(loginSchema), authController.login);
+
+// ==========================
 // 👤 PERFIL (NUEVO 🔥)
 // ==========================
 
