@@ -85,13 +85,16 @@ app.use((req, res, next) => {
 });
 
 // 🔥 Rate limiter DESPUÉS de CORS y Logging, pero SOLO para non-OPTIONS
-app.use((req, res, next) => {
-  // Excluir preflight requests del rate limiter
-  if (req.method === "OPTIONS") {
-    return next();
-  }
-  apiLimiter(req, res, next);
-});
+// 🔥 EN DESARROLLO: DESHABILITADO PARA TESTING
+if (process.env.NODE_ENV !== "development") {
+  app.use((req, res, next) => {
+    // Excluir preflight requests del rate limiter
+    if (req.method === "OPTIONS") {
+      return next();
+    }
+    apiLimiter(req, res, next);
+  });
+}
 
 app.use(express.json());
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
