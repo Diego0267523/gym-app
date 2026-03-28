@@ -161,12 +161,19 @@ exports.getWeeklyTotals = (req, res) => {
         return res.status(500).json({ success: false, message: "Error al obtener totales semanales" });
       }
 
-      // Generar los 7 días incluso si no hay datos para algunos
+      // Generar los 7 días de la semana actual (lunes a domingo)
       const today = new Date();
+      const dayOfWeek = today.getDay(); // 0 = domingo, 1 = lunes
+      
+      // Calcular el primer día (lunes) de la semana actual
+      const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Si es domingo, retroceder 6 días
+      const monday = new Date(today);
+      monday.setDate(today.getDate() - daysFromMonday);
+      
       const week = [];
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date(today);
-        d.setDate(today.getDate() - i);
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
         const day = d.toISOString().split('T')[0];
         const item = results.find(r => r.fecha === day);
         week.push({ fecha: day, total_calorias: item ? Number(item.total_calorias) : 0 });
