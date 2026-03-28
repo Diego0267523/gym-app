@@ -3,6 +3,7 @@ const router = express.Router();
 const authController = require("../controllers/authController");
 const notificationsController = require("../controllers/notificationsController");
 const verifyToken = require("../middlewares/authMiddleware");
+const { authLimiter } = require("../middlewares/rateLimiter");
 const upload = require("../middlewares/upload");
 
 // ==========================
@@ -10,10 +11,10 @@ const upload = require("../middlewares/upload");
 // ==========================
 
 // REGISTRO
-router.post("/register", authController.register);
+router.post("/register", authLimiter, authController.register);
 
 // LOGIN
-router.post("/login", authController.login);
+router.post("/login", authLimiter, authController.login);
 
 // ==========================
 // 👤 PERFIL (NUEVO 🔥)
