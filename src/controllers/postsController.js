@@ -35,16 +35,23 @@ exports.createPost = (req, res) => {
         console.error("[PostController] createPost error:", err);
         return res.status(500).json({ success: false, message: "Error al crear post" });
       }
-      
+
       const postId = result.insertId;
-      
-      //  Invalidar caché de feed al crear nuevo post
-      cache.clear(CACHE_PREFIX + 'page_1');
-      
-      // Emitir evento de nueva publicación (para Socket.IO)
-      process.emit('new_post', { postId, userId: user_id });
-      
-      return res.json({ success: true, message: "Post creado", postId });
+
+      // Obtener el post completo + datos de usuario para retorno inmediato
+      postModel.getPostByIdWithUser(postId, user_id, (err2, newPost) => {
+        if (err2) {
+          console.error("[PostController] getPostByIdWithUser error:", err2);
+          return res.status(500).json({ success: false, message: "Post creado, pero no se pudo recuperar" });
+        }
+
+        cache.clear(CACHE_PREFIX + 'page_1');
+
+        // Emitir evento de nueva publicación (para Socket.IO)
+        process.emit('new_post', { post: newPost });
+
+        return res.json({ success: true, message: "Post creado", post: newPost });
+      });
     });
   } catch (error) {
     console.error("[PostController] createPost exception:", error);

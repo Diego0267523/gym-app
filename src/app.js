@@ -225,11 +225,9 @@ io.on("connection", (socket) => {
 
 // 🔥 Evento para nuevas publicaciones
 process.on('new_post', (data) => {
-  io.sockets.sockets.forEach(socket => {
-    if (socket.data.userId && socket.data.userId !== data.userId) {
-      socket.emit('new_post', { postId: data.postId });
-    }
-  });
+  if (!data?.post) return;
+  // Emitir a todos (incluyendo el autor) para mantener feed sincronizado
+  io.sockets.emit('new_post', { post: data.post });
 });
 
 // 🔥 Evento para post eliminado

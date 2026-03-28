@@ -130,6 +130,37 @@ exports.getPostById = (postId, callback) => {
   });
 };
 
+exports.getPostByIdWithUser = (postId, authUserId, callback) => {
+  const sql = `
+    SELECT
+      p.id,
+      p.user_id,
+      p.image_url,
+      p.caption,
+      p.created_at AS time,
+      u.nombre,
+      u.avatar,
+      COALESCE(COUNT(DISTINCT l.id), 0) AS likes,
+      COALESCE(COUNT(DISTINCT c.id), 0) AS commentsCount,
+      CASE WHEN MAX(CASE WHEN ul.user_id IS NOT NULL THEN 1 ELSE 0 END) = 1 THEN 1 ELSE 0 END AS liked
+    FROM posts p
+    INNER JOIN usuarios u ON p.user_id = u.id
+    LEFT JOIN likes l ON p.id = l.post_id
+    LEFT JOIN comments c ON p.id = c.post_id
+    LEFT JOIN likes ul ON p.id = ul.post_id AND ul.user_id = ?
+    WHERE p.id = ?
+    GROUP BY p.id, p.user_id, p.image_url, p.caption, p.created_at, u.id, u.nombre, u.avatar
+  `;
+
+  db.query(sql, [authUserId, postId], (err, rows) => {
+    if (err) {
+      console.error('[PostModel] Error in getPostByIdWithUser:', err.message);
+      return callback(err);
+    }
+    callback(null, rows?.[0] || null);
+  });
+};
+
 /**
  * Eliminar post
  * @param {number} postId Post ID
