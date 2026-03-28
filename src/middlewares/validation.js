@@ -52,14 +52,14 @@ const createFoodEntrySchema = Joi.object({
           calorias: Joi.number().min(0).max(10000).required(),
           proteina: Joi.number().min(0).max(1000).required(),
           carbohidratos: Joi.number().min(0).max(1000).required()
-        })
+        }).unknown(true) // permite campos adicionales en items
       ).required(),
       total: Joi.object({
         calorias: Joi.number().min(0).max(10000).required(),
         proteina: Joi.number().min(0).max(1000).required(),
         carbohidratos: Joi.number().min(0).max(1000).required()
       }).optional()
-    }),
+    }).unknown(true), // permite campos adicionales como 'comentario'
     Joi.string() // permite recibir json como string en multipart/form-data
   ).optional()
 }).or('descripcion', 'calorias', 'proteina', 'carbohidratos', 'aiJson')
