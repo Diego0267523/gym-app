@@ -84,7 +84,7 @@ exports.getPosts = (req, res) => {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
     const offset = (page - 1) * limit;
-    const authUserId = req.user?.id || null;
+    const authUserId = req.user?.id ?? 0;
 
     // Intentar caché (solo para first page)
     const cacheKey = CACHE_PREFIX + `page_${page}_limit_${limit}`;
