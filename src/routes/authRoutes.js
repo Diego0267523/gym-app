@@ -3,7 +3,7 @@ const router = express.Router();
 const authController = require("../controllers/authController");
 const notificationsController = require("../controllers/notificationsController");
 const verifyToken = require("../middlewares/authMiddleware");
-const { authLimiter } = require("../middlewares/rateLimiter");
+const { authLimiter, profileLimiter } = require("../middlewares/rateLimiter");
 const upload = require("../middlewares/upload");
 
 // ==========================
@@ -21,7 +21,7 @@ router.post("/login", authLimiter, authController.login);
 // ==========================
 
 // Obtener datos del usuario logueado
-router.get("/profile", verifyToken, authController.getProfile);
+router.get("/profile", profileLimiter, verifyToken, authController.getProfile);
 
 // 📸 Actualizar avatar
 router.put("/profile/avatar", verifyToken, upload.single("avatar"), authController.updateAvatar);

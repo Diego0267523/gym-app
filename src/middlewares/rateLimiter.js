@@ -48,9 +48,22 @@ const uploadLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Limiter for profile endpoint (more permissive since it's called on app load)
+const profileLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 500, // Limit each IP to 500 profile requests per windowMs
+  message: {
+    success: false,
+    message: 'Demasiadas solicitudes de perfil desde esta IP, por favor intenta más tarde.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 module.exports = {
   apiLimiter,
   authLimiter,
   aiLimiter,
   uploadLimiter,
+  profileLimiter,
 };
