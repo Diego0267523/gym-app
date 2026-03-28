@@ -1,11 +1,28 @@
 const foodModel = require("../models/foodModel");
 const logger = require("../config/logger");
 const { createFoodEntrySchema } = require("../middlewares/validation");
-// const sharp = require("sharp"); // 🔥 Para compresión de imágenes - instalar con npm install sharp
 
 // ==========================
-// 🍽️ CONTROLADOR DE COMIDA
+// 🍽️ CONTROLADOR DE COMIDA - MANEJO PROFESIONAL DE ZONAS HORARIAS
 // ==========================
+
+/**
+ * Función auxiliar para obtener zona horaria del usuario
+ * @param {object} user - Usuario JWT decodificado
+ * @returns {string} - Offset en formato "+HH:MM" o "-HH:MM"
+ */
+const getUserTimezoneOffset = (req) => {
+    // Opción 1: De header (recomendado para frontend)
+    const tzFromHeader = req.headers['x-timezone-offset'];
+    if (tzFromHeader) return tzFromHeader;
+    
+    // Opción 2: De BD (si almacenan perfil)
+    const tzFromUser = req.user?.timezone_offset;
+    if (tzFromUser) return tzFromUser;
+    
+    // Fallback: UTC
+    return '+00:00';
+};
 
 // Crear entrada de comida
 exports.createFoodEntry = (req, res) => {
@@ -22,6 +39,7 @@ exports.createFoodEntry = (req, res) => {
       return res.status(400).json({ success: false, message: "Datos inválidos", errors });
     }
 
+    const userTimezone = getUserTimezoneOffset(req);
     const { descripcion, calorias, proteina, carbohidratos, fecha } = req.body;
     let { aiJson } = req.body;
     const image_url = req.file ? (req.file.secure_url || req.file.path || req.file.url) : null;
@@ -34,10 +52,11 @@ exports.createFoodEntry = (req, res) => {
       }
     }
 
-    // 🔥 Si el payload trae items de IA, guardamos todos ellos (bulk) para evitar invalid datos.
+    // Si el payload trae items de IA, guardamos todos ellos (bulk)
     if (aiJson && aiJson.items && Array.isArray(aiJson.items) && aiJson.items.length > 0) {
       const entries = aiJson.items.map(item => ({
         user_id,
+        userTimezone,
         descripcion: item.nombre || descripcion || 'Comida de IA',
         calorias: Number(item.calorias || 0),
         proteina: Number(item.proteina || 0),
@@ -50,32 +69,19 @@ exports.createFoodEntry = (req, res) => {
         return res.status(400).json({ success: false, message: "No hay valores nutricionales válidos en aiJson" });
       }
 
-      return foodModel.createFoodEntriesBulk(entries, (err, result) => {
+      return foodModel.createFoodEntriesBulk(entries, userTimezone, (err, result) => {
         if (err) {
           logger.error("Error en createFoodEntriesBulk:", { error: err.message, user_id, aiJson });
           return res.status(500).json({ success: false, message: "Error al guardar entradas de comida" });
         }
-        logger.info("Entradas de comida bulk creadas", { user_id, entries: entries.length });
+        logger.info("Entradas de comida bulk creadas", { user_id, entries: entries.length, timezone: userTimezone });
         return res.json({ success: true, message: "Entradas de comida guardadas (bulk)", insertedCount: entries.length });
       });
     }
 
-    // 🔥 OPTIMIZACIÓN: Comprimir imagen si existe
-    if (req.file && req.file.buffer) {
-      try {
-        // const compressedBuffer = await sharp(req.file.buffer)
-        //   .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
-        //   .jpeg({ quality: 80 })
-        //   .toBuffer();
-        // req.file.buffer = compressedBuffer; // Reemplazar buffer comprimido
-        logger.info("Imagen comprimida (implementar con sharp)");
-      } catch (compressError) {
-        logger.warn("Error comprimiendo imagen:", compressError.message);
-      }
-    }
-
     const entry = {
       user_id,
+      userTimezone,
       descripcion: descripcion || '',
       calorias: parseFloat(calorias) || 0,
       proteina: parseFloat(proteina) || 0,
@@ -122,7 +128,7 @@ exports.getFoodEntries = (req, res) => {
   }
 };
 
-// Obtener totales diarios
+// Obtener totales diarios - CON ZONA HORARIA CORRECTA
 exports.getDailyTotals = (req, res) => {
   try {
     const user_id = req.user?.id;
@@ -130,30 +136,33 @@ exports.getDailyTotals = (req, res) => {
       return res.status(401).json({ success: false, message: "Usuario no autenticado" });
     }
 
+    const userTimezone = getUserTimezoneOffset(req);
     const fecha = req.query.fecha || new Date().toISOString().split('T')[0];
 
-    foodModel.getDailyTotals(user_id, fecha, (err, results) => {
+    foodModel.getDailyTotals(user_id, fecha, userTimezone, (err, results) => {
       if (err) {
-        logger.error("Error en getDailyTotals:", { error: err.message, user_id, fecha });
+        logger.error("Error en getDailyTotals:", { error: err.message, user_id, fecha, timezone: userTimezone });
         return res.status(500).json({ success: false, message: "Error al obtener totales diarios" });
       }
       const totals = results[0] || { total_calorias: 0, total_proteina: 0, total_carbohidratos: 0 };
-      logger.info("Totales diarios obtenidos", { user_id, fecha, totals });
+      logger.info("Totales diarios obtenidos", { user_id, fecha, timezone: userTimezone, totals });
       return res.json({ success: true, totals });
     });
   } catch (error) {
-    logger.error("Error en getDailyTotals:", { error: error.message, stack: error.stack, user_id });
+    logger.error("Error en getDailyTotals:", { error: error.message, stack: error.stack, user_id: req.user?.id });
     return res.status(500).json({ success: false, message: "Error interno del servidor" });
   }
 };
 
-// Obtener totales de la semana
+// Obtener totales de la semana - CON ZONA HORARIA CORRECTA
 exports.getWeeklyTotals = (req, res) => {
   try {
     const user_id = req.user?.id;
     if (!user_id) {
       return res.status(401).json({ success: false, message: "Usuario no autenticado" });
     }
+
+    const userTimezone = getUserTimezoneOffset(req);
 
     // Generar los 7 días de la semana actual (lunes a domingo)
     const today = new Date();
@@ -170,9 +179,9 @@ exports.getWeeklyTotals = (req, res) => {
       weekDates.push(d.toISOString().split('T')[0]);
     }
 
-    foodModel.getWeeklyTotals(user_id, weekDates, (err, results) => {
+    foodModel.getWeeklyTotals(user_id, weekDates, userTimezone, (err, results) => {
       if (err) {
-        logger.error("Error en getWeeklyTotals:", { error: err.message, user_id });
+        logger.error("Error en getWeeklyTotals:", { error: err.message, user_id, timezone: userTimezone });
         return res.status(500).json({ success: false, message: "Error al obtener totales semanales" });
       }
 
@@ -184,7 +193,7 @@ exports.getWeeklyTotals = (req, res) => {
         week.push({ fecha: day, total_calorias: item ? Number(item.total_calorias) : 0 });
       }
 
-      logger.info("Totales semanales obtenidos", { user_id, week });
+      logger.info("Totales semanales obtenidos", { user_id, timezone: userTimezone, week });
       return res.json({ success: true, week });
     });
   } catch (error) {
