@@ -75,36 +75,42 @@ Pregunta: ${pregunta}
   }
 };
 
+const runChatAssistant = async (pregunta) => {
+  if (!pregunta || pregunta.trim() === "") {
+    throw new Error("La pregunta no puede estar vacía ❌");
+  }
+
+  const tipo = classifyQuestion(pregunta);
+  const prompt = buildPrompt(tipo, pregunta);
+
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const result = await model.generateContent(prompt);
+
+  console.log("📥 RAW GEMINI:", result);
+
+  const respuesta = safeText(result);
+  return respuesta;
+};
+
 // 🔥 Controlador para chat inteligente
 exports.chatAssistant = async (req, res) => {
   try {
     const { pregunta } = req.body;
-
-    if (!pregunta || pregunta.trim() === "") {
-      return res.status(400).json({ message: "La pregunta no puede estar vacía ❌" });
-    }
-
-    const tipo = classifyQuestion(pregunta);
-    const prompt = buildPrompt(tipo, pregunta);
-
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-    const result = await model.generateContent(prompt);
-
-    console.log("📥 RAW GEMINI:", result); // log completo para debug
-
-    const respuesta = safeText(result);
-
+    const respuesta = await runChatAssistant(pregunta);
     res.json({ respuesta });
-
   } catch (error) {
     console.log("🔥 ERROR IA CHAT:", error);
-
+    if (error.message.includes("vacía")) {
+      return res.status(400).json({ message: error.message });
+    }
     res.status(500).json({
       message: "Error IA",
       error: error.message
     });
   }
 };
+
+exports.runChatAssistant = runChatAssistant;
 
 // Helper de parseo simple
 const parseCaloriesFromText = (text) => {

@@ -8,6 +8,9 @@ const db = require("./config/db");
 const logger = require("./config/logger");
 const { apiLimiter } = require("./middlewares/rateLimiter");
 
+const http = require('http');
+const { Server } = require('socket.io');
+
 const aiRoutes = require("./routes/aiRoutes");
 const postRoutes = require("./routes/postRoutes");
 const authRoutes = require("./routes/authRoutes");
@@ -98,6 +101,42 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", message: "Servidor corriendo" });
 });
 
+// 🌐 Socket.IO configuration
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+});
+
+const { runChatAssistant } = require("./controllers/aiController");
+
+io.on("connection", (socket) => {
+  console.log(`✨ Socket conectado: ${socket.id}`);
+
+  socket.on("ask_ai", async (data) => {
+    try {
+      if (!data?.pregunta || !data.pregunta.trim()) {
+        socket.emit("ai_error", "La pregunta no puede estar vacía");
+        return;
+      }
+
+      const respuesta = await runChatAssistant(data.pregunta);
+      socket.emit("ai_response", { pregunta: data.pregunta, respuesta });
+    } catch (err) {
+      console.error("🔥 Error socket AI:", err);
+      socket.emit("ai_error", "Error en el asistente IA. Intenta de nuevo.");
+    }
+  });
+
+  socket.on("disconnect", () => {
+    console.log(`⚡ Socket desconectado: ${socket.id}`);
+  });
+});
+
 // DB status endpoint
 app.get("/status", (req, res) => {
   db.query("SELECT 1 + 1 AS value", (err, results) => {
@@ -122,7 +161,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`✅ Servidor corriendo en puerto ${PORT}`);
   console.log(`🔥 CRON job configurado para limpiar historias cada hora`);
 });
