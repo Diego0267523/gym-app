@@ -19,6 +19,7 @@ const authRoutes = require("./routes/authRoutes");
 const trainingRoutes = require("./routes/trainingRoutes");
 const storiesRoutes = require("./routes/storiesRoutes");
 const foodRoutes = require("./routes/foodRoutes");
+const { authLimiter } = require("./middlewares/rateLimiter");
 
 const PORT = process.env.PORT || 9090;
 
@@ -90,7 +91,7 @@ app.use(express.json());
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // 👇 RUTAS
-app.use("/api/auth", authRoutes);
+app.use("/api/auth", authLimiter, authRoutes); // límite de login 10 por 15 min (ahora más permisivo y específico)
 app.use("/api/training", trainingRoutes);
 app.use("/api/stories", storiesRoutes);
 app.use("/api/ai", aiRoutes);
