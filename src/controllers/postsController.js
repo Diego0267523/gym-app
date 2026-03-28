@@ -242,6 +242,9 @@ exports.deletePost = async (req, res) => {
 
     cache.clear(CACHE_PREFIX + 'page_1');
 
+    // Emitir evento global para sockets
+    process.emit('post_deleted', { postId });
+
     return res.status(200).json({ success: true, message: "Post eliminado" });
   } catch (error) {
     console.error("[PostController] deletePost exception:", error);

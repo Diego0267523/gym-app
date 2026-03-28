@@ -232,6 +232,11 @@ process.on('new_post', (data) => {
   });
 });
 
+// 🔥 Evento para post eliminado
+process.on('post_deleted', (data) => {
+  io.sockets.emit('post_deleted', { postId: data.postId });
+});
+
 // DB status endpoint
 app.get("/status", (req, res) => {
   db.query("SELECT 1 + 1 AS value", (err, results) => {
