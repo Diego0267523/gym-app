@@ -10,7 +10,7 @@ const { createFoodEntrySchema, validate } = require("../middlewares/validation")
 // ==========================
 
 // Crear entrada de comida (con imagen opcional)
-router.post("/entries", verifyToken, upload.single("image"), validate(createFoodEntrySchema), foodController.createFoodEntry);
+router.post("/entries", verifyToken, upload.single("image"), foodController.createFoodEntry);
 
 // Obtener entradas de comida del día
 router.get("/entries", verifyToken, foodController.getFoodEntries);

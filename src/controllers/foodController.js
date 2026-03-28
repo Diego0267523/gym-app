@@ -1,5 +1,6 @@
 const foodModel = require("../models/foodModel");
 const logger = require("../config/logger");
+const { createFoodEntrySchema } = require("../middlewares/validation");
 // const sharp = require("sharp"); // 🔥 Para compresión de imágenes - instalar con npm install sharp
 
 // ==========================
@@ -12,6 +13,13 @@ exports.createFoodEntry = (req, res) => {
     const user_id = req.user?.id;
     if (!user_id) {
       return res.status(401).json({ success: false, message: "Usuario no autenticado" });
+    }
+
+    const { error } = createFoodEntrySchema.validate(req.body, { abortEarly: false, convert: true });
+    if (error) {
+      const errors = error.details.map((d) => d.message);
+      logger.warn("validacion createFoodEntry fallida", { user_id, errors, body: req.body });
+      return res.status(400).json({ success: false, message: "Datos inválidos", errors });
     }
 
     const { descripcion, calorias, proteina, carbohidratos, fecha } = req.body;
