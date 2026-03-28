@@ -10,6 +10,7 @@ const { apiLimiter } = require("./middlewares/rateLimiter");
 
 const http = require('http');
 const { Server } = require('socket.io');
+const jwt = require('jsonwebtoken');
 
 const aiRoutes = require("./routes/aiRoutes");
 const postRoutes = require("./routes/postRoutes");
@@ -114,8 +115,75 @@ const io = new Server(server, {
 
 const { runChatAssistant } = require("./controllers/aiController");
 
+const likesModel = require("./models/likesModel");
+const commentsModel = require("./models/commentsModel");
+
 io.on("connection", (socket) => {
   console.log(`✨ Socket conectado: ${socket.id}`);
+
+  // JWT authentication
+  const token = socket.handshake.auth.token;
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      socket.data.userId = decoded.id;
+      console.log(`👤 Usuario autenticado: ${socket.data.userId}`);
+    } catch (err) {
+      console.log(`❌ Token inválido para socket: ${socket.id}`);
+    }
+  }
+
+  // Join/Leave post rooms
+  socket.on("join_post", (data) => {
+    if (data.postId) {
+      socket.join(`post_${data.postId}`);
+      console.log(`📱 Socket ${socket.id} joined post_${data.postId}`);
+    }
+  });
+
+  socket.on("leave_post", (data) => {
+    if (data.postId) {
+      socket.leave(`post_${data.postId}`);
+      console.log(`📱 Socket ${socket.id} left post_${data.postId}`);
+    }
+  });
+
+  // Like post
+  socket.on("like_post", async (data) => {
+    if (!socket.data.userId || !data.postId) return;
+
+    try {
+      await likesModel.toggleLike(socket.data.userId, data.postId);
+      const likesCount = await likesModel.getLikesCount(data.postId);
+      const isLiked = await likesModel.isLikedByUser(socket.data.userId, data.postId);
+
+      io.to(`post_${data.postId}`).emit("post_like_updated", {
+        postId: data.postId,
+        likesCount,
+        isLiked
+      });
+    } catch (err) {
+      console.error("❌ Error toggling like:", err);
+    }
+  });
+
+  // Comment post
+  socket.on("comment_post", async (data) => {
+    if (!socket.data.userId || !data.postId || !data.comment) return;
+
+    try {
+      const comment = await commentsModel.addComment(socket.data.userId, data.postId, data.comment);
+      const commentsCount = await commentsModel.getCommentsCount(data.postId);
+
+      io.to(`post_${data.postId}`).emit("post_comment_added", {
+        postId: data.postId,
+        comment,
+        commentsCount
+      });
+    } catch (err) {
+      console.error("❌ Error adding comment:", err);
+    }
+  });
 
   socket.on("ask_ai", async (data) => {
     try {
