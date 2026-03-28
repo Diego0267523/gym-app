@@ -99,14 +99,14 @@ const getDailyTotals = (userId, fecha, callback) => {
 const getWeeklyTotals = (userId, callback) => {
     const sql = `
         SELECT
-            DATE(fecha) as fecha,
+            CAST(fecha AS DATE) as fecha,
             COALESCE(SUM(calorias), 0) AS total_calorias
         FROM food_entries
         WHERE user_id = ? 
-          AND DATE(fecha) >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)
-          AND DATE(fecha) <= DATE_ADD(DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), INTERVAL 6 DAY)
-        GROUP BY DATE(fecha)
-        ORDER BY DATE(fecha) ASC
+          AND CAST(fecha AS DATE) >= CURDATE() - INTERVAL WEEKDAY(CURDATE()) DAY
+          AND CAST(fecha AS DATE) <= CURDATE() + INTERVAL (6 - WEEKDAY(CURDATE())) DAY
+        GROUP BY CAST(fecha AS DATE)
+        ORDER BY CAST(fecha AS DATE) ASC
     `;
     db.query(sql, [userId], callback);
 };
