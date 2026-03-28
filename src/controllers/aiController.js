@@ -4,7 +4,7 @@ const SPOON_API_KEY = process.env.SPOONACULAR_API_KEY;
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+
 const axios = require("axios");
 
 // 🔥 CACHE SIMPLE EN MEMORIA
