@@ -8,7 +8,7 @@ const userModel = require("../models/userModel");
 exports.register = async (req, res) => {
   try {
     const {
-      nombre, email, password,
+      username, nombre, email, password,
       peso, altura,
       genero, objetivo, frecuencia,
       nivelActividad, tiempoObjetivo,
@@ -17,7 +17,10 @@ exports.register = async (req, res) => {
       profesion, sueno
     } = req.body;
 
-    if (!nombre || !email || !password) {
+    // Aceptar tanto 'username' como 'nombre'
+    const finalNombre = nombre || username;
+
+    if (!finalNombre || !email || !password) {
       return res.status(400).json({
         success: false,
         message: "Nombre, email y contraseña son obligatorios"
@@ -37,7 +40,7 @@ exports.register = async (req, res) => {
       const hashedPassword = await bcrypt.hash(password, 10);
 
       userModel.createUser(
-        { nombre, email, password: hashedPassword },
+        { nombre: finalNombre, email, password: hashedPassword },
         (err, result) => {
           if (err) return res.status(500).json({ success: false });
 
