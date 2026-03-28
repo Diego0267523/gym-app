@@ -59,5 +59,15 @@ function stats() {
     keys: Array.from(cache.keys()),
   };
 }
-
-module.exports = { get, set, clear, clearAll, stats };
+/**
+ * Clear cache by prefix (PRO)
+ * @param {string} prefix Prefix of keys to delete
+ */
+function clearByPrefix(prefix) {
+  for (const key of cache.keys()) {
+    if (key.startsWith(prefix)) {
+      cache.delete(key);
+    }
+  }
+}
+module.exports = { get, set, clear, clearAll, clearByPrefix, stats };
