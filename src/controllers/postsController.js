@@ -1,4 +1,5 @@
-﻿const postModel = require("../models/postModel");
+﻿const db = require("../config/db");
+const postModel = require("../models/postModel");
 const likesModel = require("../models/likesModel");
 const commentsModel = require("../models/commentsModel");
 const cache = require("../utils/cache");
@@ -207,7 +208,7 @@ exports.addComment = (req, res) => {
 /**
  * Eliminar post (con invalidación de caché)
  */
-exports.deletePost = (req, res) => {
+exports.deletePost = async (req, res) => {
   try {
     const userId = req.user?.id;
     const postId = parseInt(req.params.id, 10);
@@ -215,63 +216,35 @@ exports.deletePost = (req, res) => {
     if (!userId) {
       return res.status(401).json({ success: false, message: "Usuario no autenticado" });
     }
-    if (!postId || isNaN(postId)) {
+
+    if (!Number.isInteger(postId) || postId <= 0) {
       return res.status(400).json({ success: false, message: "ID de post inválido" });
     }
 
-    postModel.getPostById(postId, (err, post) => {
-      if (err) {
-        console.error("[PostController] getPostById error:", err);
-        return res.status(500).json({ success: false, message: "Error obteniendo post" });
-      }
-      if (!post) {
-        return res.status(404).json({ success: false, message: "Post no encontrado" });
-      }
-      if (post.user_id !== userId) {
-        return res.status(403).json({ success: false, message: "No autorizado para eliminar este post" });
-      }
+    const [postRows] = await db.promise().query("SELECT id, user_id FROM posts WHERE id = ?", [postId]);
+    if (!Array.isArray(postRows) || postRows.length === 0) {
+      return res.status(404).json({ success: false, message: "Post no encontrado" });
+    }
 
-      // Eliminación en paralelo (3 operaciones)
-      let completed = 0;
-      let hasError = false;
+    const post = postRows[0];
+    if (post.user_id !== userId) {
+      return res.status(403).json({ success: false, message: "No autorizado para eliminar este post" });
+    }
 
-      const checkCompletion = () => {
-        completed++;
-        if (completed === 2 && !hasError) {
-          postModel.deletePost(postId, (deleteErr) => {
-            if (deleteErr) {
-              console.error("[PostController] deletePost error:", deleteErr);
-              return res.status(500).json({ success: false, message: "Error eliminando post" });
-            }
-            
-            // Invalidar cache
-            cache.clear(CACHE_PREFIX + 'page_1');
-            
-            return res.json({ success: true, message: "Post eliminado" });
-          });
-        }
-      };
+    // Borrado manual de relaciones cuando no hay ON DELETE CASCADE
+    await db.promise().query("DELETE FROM comments WHERE post_id = ?", [postId]);
+    await db.promise().query("DELETE FROM likes WHERE post_id = ?", [postId]);
 
-      // Eliminar comentarios
-      commentsModel.deleteCommentsByPostId?.(postId, (commErr) => {
-        if (commErr) {
-          console.error("[PostController] Error deleting comments:", commErr);
-          hasError = true;
-        }
-        checkCompletion();
-      });
+    const [deleteResult] = await db.promise().query("DELETE FROM posts WHERE id = ?", [postId]);
+    if (!deleteResult || deleteResult.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: "Post no encontrado al eliminar" });
+    }
 
-      // Eliminar likes
-      likesModel.deleteLikesByPostId?.(postId, (likeErr) => {
-        if (likeErr) {
-          console.error("[PostController] Error deleting likes:", likeErr);
-          hasError = true;
-        }
-        checkCompletion();
-      });
-    });
+    cache.clear(CACHE_PREFIX + 'page_1');
+
+    return res.status(200).json({ success: true, message: "Post eliminado" });
   } catch (error) {
     console.error("[PostController] deletePost exception:", error);
-    return res.status(500).json({ success: false, message: "Error eliminando post" });
+    return res.status(500).json({ success: false, message: error?.message || "Error eliminando post" });
   }
 };
