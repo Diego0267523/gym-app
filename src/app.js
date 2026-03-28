@@ -11,6 +11,7 @@ const { apiLimiter } = require("./middlewares/rateLimiter");
 const http = require('http');
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
+const util = require('util');
 
 const aiRoutes = require("./routes/aiRoutes");
 const postRoutes = require("./routes/postRoutes");
@@ -118,6 +119,13 @@ const { runChatAssistant } = require("./controllers/aiController");
 const likesModel = require("./models/likesModel");
 const commentsModel = require("./models/commentsModel");
 
+// Promisify model functions
+const toggleLikePromise = util.promisify(likesModel.toggleLike);
+const getLikesCountPromise = util.promisify(likesModel.getLikesCount);
+const isLikedByUserPromise = util.promisify(likesModel.isPostLikedByUser);
+const addCommentPromise = util.promisify(commentsModel.addComment);
+const getCommentsCountPromise = util.promisify(commentsModel.getCommentsCount);
+
 io.on("connection", (socket) => {
   console.log(`✨ Socket conectado: ${socket.id}`);
 
@@ -153,14 +161,14 @@ io.on("connection", (socket) => {
     if (!socket.data.userId || !data.postId) return;
 
     try {
-      await likesModel.toggleLike(socket.data.userId, data.postId);
-      const likesCount = await likesModel.getLikesCount(data.postId);
-      const isLiked = await likesModel.isLikedByUser(socket.data.userId, data.postId);
+      const result = await toggleLikePromise(socket.data.userId, data.postId);
+      const likesCount = await getLikesCountPromise(data.postId);
+      const isLiked = await isLikedByUserPromise(socket.data.userId, data.postId);
 
       io.to(`post_${data.postId}`).emit("post_like_updated", {
         postId: data.postId,
         likesCount,
-        isLiked
+        likedByCurrent: isLiked
       });
     } catch (err) {
       console.error("❌ Error toggling like:", err);
@@ -172,8 +180,8 @@ io.on("connection", (socket) => {
     if (!socket.data.userId || !data.postId || !data.comment) return;
 
     try {
-      const comment = await commentsModel.addComment(socket.data.userId, data.postId, data.comment);
-      const commentsCount = await commentsModel.getCommentsCount(data.postId);
+      const comment = await addCommentPromise(socket.data.userId, data.postId, data.comment);
+      const commentsCount = await getCommentsCountPromise(data.postId);
 
       io.to(`post_${data.postId}`).emit("post_comment_added", {
         postId: data.postId,
