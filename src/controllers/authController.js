@@ -204,11 +204,16 @@ exports.login = (req, res) => {
 // ==========================
 exports.getProfile = (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      console.error("Error en profile: req.user no definido");
+      return res.status(401).json({ message: "No autenticado" });
+    }
 
     userModel.getFullProfileById(userId, (err, results) => {
       if (err) {
-        console.error(err);
+        console.error("Error en profile DB:", err);
         return res.status(500).json({
           success: false,
           message: "Error en servidor"
@@ -216,6 +221,7 @@ exports.getProfile = (req, res) => {
       }
 
       if (results.length === 0) {
+        console.error("Error en profile: usuario no encontrado, userId:", userId);
         return res.status(404).json({
           success: false,
           message: "Usuario no encontrado"
@@ -226,10 +232,10 @@ exports.getProfile = (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("Error en profile catch:", error);
     return res.status(500).json({
       success: false,
-      message: "Error interno"
+      message: "Error en servidor"
     });
   }
 };
