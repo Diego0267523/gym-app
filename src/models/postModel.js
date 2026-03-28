@@ -35,7 +35,7 @@ exports.getPosts = (limit, offset, callback) => {
       p.created_at AS time,
       u.nombre,
       u.avatar,
-      COALESCE(COUNT(DISTINCT l.id), 0) AS likes,
+      COALESCE(COUNT(DISTINCT l.post_id), 0) AS likes,
       COALESCE(COUNT(DISTINCT c.id), 0) AS commentsCount
     FROM posts p
     INNER JOIN usuarios u ON p.user_id = u.id
@@ -76,7 +76,7 @@ exports.getPostsWithUserLikeStatus = (limit, offset, authUserId, callback) => {
       p.created_at AS time,
       u.nombre,
       u.avatar,
-      COALESCE(COUNT(DISTINCT l.id), 0) AS likes,
+      COALESCE(COUNT(DISTINCT l.post_id), 0) AS likes,
       COALESCE(COUNT(DISTINCT c.id), 0) AS commentsCount,
       IF(MAX(ul.user_id IS NOT NULL), 1, 0) AS liked
     FROM posts p
@@ -111,7 +111,7 @@ exports.getPostById = (postId, callback) => {
       p.image_url,
       p.caption,
       p.created_at AS time,
-      COALESCE(COUNT(DISTINCT l.id), 0) AS likes,
+      COALESCE(COUNT(DISTINCT l.post_id), 0) AS likes,
       COALESCE(COUNT(DISTINCT c.id), 0) AS commentsCount
     FROM posts p
     LEFT JOIN likes l ON p.id = l.post_id
@@ -138,7 +138,7 @@ exports.getPostByIdWithUser = (postId, authUserId, callback) => {
       p.created_at AS time,
       u.nombre,
       u.avatar,
-      COALESCE(COUNT(DISTINCT l.id), 0) AS likes,
+      COALESCE(COUNT(DISTINCT l.post_id), 0) AS likes,
       COALESCE(COUNT(DISTINCT c.id), 0) AS commentsCount,
       IF(MAX(ul.user_id IS NOT NULL), 1, 0) AS liked
     FROM posts p
