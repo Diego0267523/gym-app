@@ -12,7 +12,7 @@ const createFoodEntry = (entry, callback) => {
     `;
     const values = [
         entry.user_id,
-        entry.fecha || new Date().toISOString().split('T')[0], // Fecha en formato YYYY-MM-DD
+        entry.fecha || new Date(), // almacenar DATETIME/TIMESTAMP; usar JS Date en lugar de YYYY-MM-DD string
         entry.descripcion,
         entry.calorias || 0,
         entry.proteina || 0,
@@ -32,15 +32,15 @@ const createFoodEntriesBulk = (entries, callback) => {
     const values = [];
 
     entries.forEach(entry => {
-      values.push(
-        entry.user_id,
-        entry.fecha || new Date().toISOString().split('T')[0],
-        entry.descripcion,
-        entry.calorias || 0,
-        entry.proteina || 0,
-        entry.carbohidratos || 0,
-        entry.image_url || null
-      );
+            values.push(
+                entry.user_id,
+                entry.fecha || new Date(),
+                entry.descripcion,
+                entry.calorias || 0,
+                entry.proteina || 0,
+                entry.carbohidratos || 0,
+                entry.image_url || null
+            );
     });
 
     const sql = `
@@ -56,7 +56,7 @@ const getFoodEntriesByUserAndDate = (userId, fecha, callback) => {
     const sql = `
         SELECT id, descripcion, calorias, proteina, carbohidratos, image_url, created_at
         FROM food_entries
-        WHERE user_id = ? AND fecha = ?
+        WHERE user_id = ? AND DATE(fecha) = ?
         ORDER BY created_at DESC
     `;
     db.query(sql, [userId, fecha], callback);
@@ -67,7 +67,7 @@ const getFoodEntriesByUser = (userId, callback) => {
     const sql = `
         SELECT id, fecha, descripcion, calorias, proteina, carbohidratos, image_url, created_at
         FROM food_entries
-        WHERE user_id = ? AND fecha >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        WHERE user_id = ? AND DATE(fecha) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
         ORDER BY fecha DESC, created_at DESC
     `;
     db.query(sql, [userId], callback);
@@ -90,24 +90,27 @@ const getDailyTotals = (userId, fecha, callback) => {
             SUM(proteina) AS total_proteina,
             SUM(carbohidratos) AS total_carbohidratos
         FROM food_entries
-        WHERE user_id = ? AND fecha = ?
+        WHERE user_id = ? AND DATE(fecha) = ?
     `;
     db.query(sql, [userId, fecha], callback);
 };
 
 // Obtener totales de calorías para 7 fechas específicas (lunes a domingo)
-const getWeeklyTotals = (userId, weekDates, callback) => {
+// Agrupa por la fecha local calculada a partir de created_at usando CONVERT_TZ.
+// Parámetros: userId, weekDates (array de 'YYYY-MM-DD'), tzOffset (ej. '-05:00')
+const getWeeklyTotals = (userId, weekDates, tzOffset, callback) => {
+    if (!Array.isArray(weekDates) || weekDates.length === 0) return callback(null, []);
     const placeholders = weekDates.map(() => '?').join(',');
     const sql = `
         SELECT
-            fecha,
+            DATE(CONVERT_TZ(created_at, '+00:00', ?)) AS fecha_local,
             COALESCE(SUM(calorias), 0) AS total_calorias
         FROM food_entries
-        WHERE user_id = ? AND fecha IN (${placeholders})
-        GROUP BY fecha
-        ORDER BY fecha ASC
+        WHERE user_id = ? AND DATE(CONVERT_TZ(created_at, '+00:00', ?)) IN (${placeholders})
+        GROUP BY fecha_local
+        ORDER BY fecha_local ASC
     `;
-    const values = [userId, ...weekDates];
+    const values = [tzOffset, userId, tzOffset, ...weekDates];
     db.query(sql, values, callback);
 };
 

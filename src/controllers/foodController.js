@@ -3,6 +3,42 @@ const logger = require("../config/logger");
 const { createFoodEntrySchema } = require("../middlewares/validation");
 // const sharp = require("sharp"); // 🔥 Para compresión de imágenes - instalar con npm install sharp
 
+// === Helpers para manejo de zona horaria y fechas ===
+const DEFAULT_TZ_OFFSET = process.env.SERVER_TZ_OFFSET || '-05:00'; // fallback UTC-5
+
+function parseOffsetToMinutes(offset) {
+  const m = /^([+-])(\d{2}):(\d{2})$/.exec(offset);
+  if (!m) return 0;
+  const sign = m[1] === '-' ? -1 : 1;
+  return sign * (parseInt(m[2], 10) * 60 + parseInt(m[3], 10));
+}
+
+function formatDateFromMs(ms) {
+  const d = new Date(ms);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function localNowMs(offset) {
+  const mins = parseOffsetToMinutes(offset);
+  return Date.now() + mins * 60000;
+}
+
+function generateWeekDatesForOffset(offset) {
+  const nowMs = localNowMs(offset);
+  const dayOfWeek = new Date(nowMs).getUTCDay(); // 0=domingo
+  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const mondayMs = nowMs - daysFromMonday * 24 * 60 * 60 * 1000;
+  const weekDates = [];
+  for (let i = 0; i < 7; i++) {
+    weekDates.push(formatDateFromMs(mondayMs + i * 24 * 60 * 60 * 1000));
+  }
+  return weekDates;
+}
+
+
 // ==========================
 // 🍽️ CONTROLADOR DE COMIDA
 // ==========================
@@ -42,7 +78,8 @@ exports.createFoodEntry = (req, res) => {
         calorias: Number(item.calorias || 0),
         proteina: Number(item.proteina || 0),
         carbohidratos: Number(item.carbohidratos || 0),
-        fecha: fecha || new Date().toISOString().split('T')[0],
+        // almacenar como DATETIME/TIMESTAMP: si se recibió fecha, crear Date, sino now
+        fecha: fecha ? new Date(fecha) : new Date(),
         image_url
       })).filter(e => e.calorias > 0 || e.proteina > 0 || e.carbohidratos > 0 || e.descripcion);
 
@@ -80,7 +117,8 @@ exports.createFoodEntry = (req, res) => {
       calorias: parseFloat(calorias) || 0,
       proteina: parseFloat(proteina) || 0,
       carbohidratos: parseFloat(carbohidratos) || 0,
-      fecha: fecha || new Date().toISOString().split('T')[0],
+      // almacenar fecha como Date (DATETIME/TIMESTAMP en BD)
+      fecha: fecha ? new Date(fecha) : new Date(),
       image_url
     };
 
@@ -106,7 +144,8 @@ exports.getFoodEntries = (req, res) => {
       return res.status(401).json({ success: false, message: "Usuario no autenticado" });
     }
 
-    const fecha = req.query.fecha || new Date().toISOString().split('T')[0];
+    const tz = req.query.tz || DEFAULT_TZ_OFFSET;
+    const fecha = req.query.fecha || formatDateFromMs(localNowMs(tz));
 
     foodModel.getFoodEntriesByUserAndDate(user_id, fecha, (err, results) => {
       if (err) {
@@ -130,7 +169,8 @@ exports.getDailyTotals = (req, res) => {
       return res.status(401).json({ success: false, message: "Usuario no autenticado" });
     }
 
-    const fecha = req.query.fecha || new Date().toISOString().split('T')[0];
+    const tz = req.query.tz || DEFAULT_TZ_OFFSET;
+    const fecha = req.query.fecha || formatDateFromMs(localNowMs(tz));
 
     foodModel.getDailyTotals(user_id, fecha, (err, results) => {
       if (err) {
@@ -155,34 +195,22 @@ exports.getWeeklyTotals = (req, res) => {
       return res.status(401).json({ success: false, message: "Usuario no autenticado" });
     }
 
-    // Generar los 7 días de la semana actual (lunes a domingo)
-    const today = new Date();
-    const dayOfWeek = today.getDay(); // 0 = domingo, 1 = lunes
-    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    const monday = new Date(today);
-    monday.setDate(today.getDate() - daysFromMonday);
-    
-    // Generar array de 7 fechas en formato YYYY-MM-DD
-    const weekDates = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + i);
-      weekDates.push(d.toISOString().split('T')[0]);
-    }
+    // Determinar timezone (puede venir por query ?tz= or usar default server)
+    const tz = req.query.tz || DEFAULT_TZ_OFFSET;
+    // Generar array de 7 fechas locales (lunes a domingo) según tz
+    const weekDates = generateWeekDatesForOffset(tz);
 
-    foodModel.getWeeklyTotals(user_id, weekDates, (err, results) => {
+    foodModel.getWeeklyTotals(user_id, weekDates, tz, (err, results) => {
       if (err) {
         logger.error("Error en getWeeklyTotals:", { error: err.message, user_id });
         return res.status(500).json({ success: false, message: "Error al obtener totales semanales" });
       }
 
-      // Mapear resultados a los 7 días
-      const week = [];
-      for (let i = 0; i < 7; i++) {
-        const day = weekDates[i];
-        const item = results.find(r => r.fecha === day);
-        week.push({ fecha: day, total_calorias: item ? Number(item.total_calorias) : 0 });
-      }
+      // Mapear resultados a los 7 días (results usa campo fecha_local)
+      const week = weekDates.map(day => {
+        const item = results.find(r => r.fecha_local === day || r.fecha === day);
+        return { fecha: day, total_calorias: item ? Number(item.total_calorias) : 0 };
+      });
 
       logger.info("Totales semanales obtenidos", { user_id, week });
       return res.json({ success: true, week });
