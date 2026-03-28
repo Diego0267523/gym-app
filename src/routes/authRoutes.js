@@ -16,6 +16,9 @@ router.post("/register", authLimiter, authController.register);
 // LOGIN
 router.post("/login", authLimiter, authController.login);
 
+// CHANGE PASSWORD
+router.put("/change-password", verifyToken, authController.changePassword);
+
 // ==========================
 // 👤 PERFIL (NUEVO 🔥)
 // ==========================

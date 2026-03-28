@@ -241,7 +241,78 @@ exports.getProfile = (req, res) => {
 };
 
 // ==========================
-// 📸 UPDATE AVATAR
+// � CHANGE PASSWORD
+// ==========================
+exports.changePassword = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ message: "No autenticado" });
+    }
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Contraseña actual y nueva son obligatorias"
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "La nueva contraseña debe tener al menos 6 caracteres"
+      });
+    }
+
+    // Obtener usuario actual
+    userModel.findUserById(userId, async (err, results) => {
+      if (err) {
+        console.error("Error DB changePassword:", err);
+        return res.status(500).json({ success: false, message: "Error en servidor" });
+      }
+
+      if (results.length === 0) {
+        return res.status(404).json({ success: false, message: "Usuario no encontrado" });
+      }
+
+      const user = results[0];
+
+      // Verificar contraseña actual
+      const isValidCurrent = await bcrypt.compare(currentPassword, user.password);
+      if (!isValidCurrent) {
+        return res.status(401).json({
+          success: false,
+          message: "Contraseña actual incorrecta"
+        });
+      }
+
+      // Hash nueva contraseña
+      const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+      // Actualizar en DB
+      userModel.updatePassword(userId, hashedNewPassword, (err, result) => {
+        if (err) {
+          console.error("Error updating password:", err);
+          return res.status(500).json({ success: false, message: "Error al actualizar contraseña" });
+        }
+
+        return res.json({
+          success: true,
+          message: "Contraseña actualizada exitosamente"
+        });
+      });
+    });
+
+  } catch (error) {
+    console.error("Error en changePassword:", error);
+    return res.status(500).json({ success: false, message: "Error en servidor" });
+  }
+};
+
+// ==========================
+// �📸 UPDATE AVATAR
 // ==========================
 exports.updateAvatar = (req, res) => {
   try {

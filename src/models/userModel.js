@@ -178,6 +178,12 @@ const getAvatar = (userId, callback) => {
     });
 };
 
+// Actualizar contraseña
+const updatePassword = (userId, hashedPassword, callback) => {
+    const sql = `UPDATE usuarios SET password = ? WHERE id = ?`;
+    db.query(sql, [hashedPassword, userId], callback);
+};
+
 module.exports = {
     createUser,
     findUserByEmail,
@@ -189,5 +195,6 @@ module.exports = {
     saveProfile,
     saveHealth,
     updateAvatar,
-    getAvatar
+    getAvatar,
+    updatePassword
 };
