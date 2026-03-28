@@ -68,6 +68,11 @@ exports.addComment = (userId, postId, comment, callback) => {
   });
 };
 
+exports.deleteCommentsByPostId = (postId, callback) => {
+  const sql = `DELETE FROM comments WHERE post_id = ?`;
+  db.query(sql, [postId], callback);
+};
+
 // 🔥 Función auxiliar para crear notificación de comentario
 const createCommentNotification = (fromUserId, postId, commentId, commentText, callback) => {
   // Obtener el dueño del post

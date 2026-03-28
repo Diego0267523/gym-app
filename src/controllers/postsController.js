@@ -104,6 +104,7 @@ exports.getPosts = async (req, res) => {
 
           return {
             ...post,
+            user_id: post.user_id,
             likes: likeCount,
             commentsCount: commentCount,
             liked: isLiked,
@@ -209,5 +210,57 @@ exports.addComment = (req, res) => {
   } catch (error) {
     console.error("Error addComment:", error);
     return res.status(500).json({ success: false, message: "Error creando comentario" });
+  }
+};
+
+exports.deletePost = (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const postId = parseInt(req.params.id, 10);
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Usuario no autenticado" });
+    }
+    if (!postId || isNaN(postId)) {
+      return res.status(400).json({ success: false, message: "ID de post inválido" });
+    }
+
+    postModel.getPostById(postId, (err, post) => {
+      if (err) {
+        console.error("Error getPostById:", err);
+        return res.status(500).json({ success: false, message: "Error obteniendo post" });
+      }
+      if (!post) {
+        return res.status(404).json({ success: false, message: "Post no encontrado" });
+      }
+      if (post.user_id !== userId) {
+        return res.status(403).json({ success: false, message: "No autorizado para eliminar este post" });
+      }
+
+      // Eliminar likes y comentarios asociados si no hay restricción de FK cascade
+      commentsModel.deleteCommentsByPostId?.(postId, (commErr) => {
+        if (commErr) {
+          console.error("Error deleting comments for post:", commErr);
+          // continuar de todos modos
+        }
+
+        likesModel.deleteLikesByPostId?.(postId, (likeErr) => {
+          if (likeErr) {
+            console.error("Error deleting likes for post:", likeErr);
+          }
+
+          postModel.deletePost(postId, (deleteErr) => {
+            if (deleteErr) {
+              console.error("Error deletePost:", deleteErr);
+              return res.status(500).json({ success: false, message: "Error eliminando post" });
+            }
+            return res.json({ success: true, message: "Post eliminado" });
+          });
+        });
+      });
+    });
+  } catch (error) {
+    console.error("Error deletePost:", error);
+    return res.status(500).json({ success: false, message: "Error eliminando post" });
   }
 };

@@ -55,6 +55,11 @@ exports.isPostLikedByUser = (userId, postId, callback) => {
   });
 };
 
+exports.deleteLikesByPostId = (postId, callback) => {
+  const sql = `DELETE FROM likes WHERE post_id = ?`;
+  db.query(sql, [postId], callback);
+};
+
 // 🔥 Función auxiliar para crear notificación de like
 const createLikeNotification = (fromUserId, postId, callback) => {
   // Obtener el dueño del post

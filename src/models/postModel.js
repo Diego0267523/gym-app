@@ -12,7 +12,7 @@ exports.getPosts = (limit, offset, callback) => {
   const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 10;
   const safeOffset = Number.isInteger(offset) && offset >= 0 ? offset : 0;
   const sql = `
-    SELECT p.id, p.image_url, p.caption, p.created_at AS time, u.nombre, u.avatar AS avatar
+    SELECT p.id, p.user_id, p.image_url, p.caption, p.created_at AS time, u.nombre, u.avatar AS avatar
     FROM posts p
     JOIN usuarios u ON p.user_id = u.id
     ORDER BY p.created_at DESC
@@ -29,4 +29,9 @@ exports.getPostById = (postId, callback) => {
     }
     callback(null, rows[0]);
   });
+};
+
+exports.deletePost = (postId, callback) => {
+  const sql = `DELETE FROM posts WHERE id = ?`;
+  db.query(sql, [postId], callback);
 };

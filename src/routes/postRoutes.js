@@ -19,4 +19,7 @@ router.post("/:id/like", verifyToken, postsController.toggleLike);
 router.get("/:id/comments", postsController.getComments);
 router.post("/:id/comments", verifyToken, postsController.addComment);
 
+// 🔥 eliminar post
+router.delete("/:id", verifyToken, postsController.deletePost);
+
 module.exports = router;
