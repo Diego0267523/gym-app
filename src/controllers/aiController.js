@@ -1,6 +1,14 @@
 // controllers/aiController.js
+const axios = require("axios");
+const SPOON_API_KEY = process.env.SPOONACULAR_API_KEY;
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const axios = require("axios");
+
+// 🔥 CACHE SIMPLE EN MEMORIA
+const nutritionCache = new Map();
 
 // 🔥 Función para leer resultado de Gemini de forma segura
 const safeText = (result) => {
@@ -277,6 +285,37 @@ const requestCaloriesByAI = async (promptMessage) => {
 
   return { outputText, parsed, macros, aiJson, items };
 };
+const getNutritionFromSpoonacular = async (query) => {
+  try {
+    const normalizedQuery = query.toLowerCase().trim();
+
+    // 🔥 1. Revisar cache
+    if (nutritionCache.has(normalizedQuery)) {
+      console.log("⚡ Usando cache:", normalizedQuery);
+      return nutritionCache.get(normalizedQuery);
+    }
+
+    // 🔥 2. Llamar API
+    const url = `https://api.spoonacular.com/recipes/guessNutrition?title=${encodeURIComponent(query)}&apiKey=${process.env.SPOONACULAR_API_KEY}`;
+
+    const { data } = await axios.get(url);
+
+    const result = {
+      calorias: data.calories?.value || null,
+      proteina: data.protein?.value || null,
+      carbohidratos: data.carbs?.value || null
+    };
+
+    // 🔥 3. Guardar en cache
+    nutritionCache.set(normalizedQuery, result);
+
+    return result;
+
+  } catch (error) {
+    console.log("❌ Spoonacular error:", error.response?.data || error.message);
+    return null;
+  }
+};
 
 // Nuevo endpoint: conteo de calorías por texto / imagen
 exports.countCalories = async (req, res) => {
@@ -296,12 +335,28 @@ exports.countCalories = async (req, res) => {
 
     let result = { success: true, calories: null, proteina: null, carbohidratos: null, source: null, details: {} };
 
-    if (text) {
-      const parsed = cleanCaloriesText(text);
-      if (parsed !== null) {
-        result = { ...result, calories: parsed, source: "text_regex", details: { text } };
-        return res.json(result);
-      }
+if (text) {
+  // 🔥 1. Intentar Spoonacular primero (DATOS REALES)
+  const spoon = await getNutritionFromSpoonacular(text);
+
+  if (spoon && spoon.calorias) {
+    return res.json({
+      success: true,
+      calories: spoon.calorias,
+      proteina: spoon.proteina,
+      carbohidratos: spoon.carbohidratos,
+      source: "spoonacular"
+    });
+  }
+
+  // 🔥 2. Si Spoon falla → usar regex
+  const parsed = cleanCaloriesText(text);
+  if (parsed !== null) {
+    result = { ...result, calories: parsed, source: "text_regex", details: { text } };
+    return res.json(result);
+  }
+
+  // 🔥 3. Último recurso → IA
 
       const prompt = `Eres un nutricionista. Dada la siguiente descripción de comida, responde ÚNICAMENTE con JSON válido (nada más) en este formato:\n` +
         `{"items":[{"nombre":"...","calorias":number,"proteina":number,"carbohidratos":number}],"total":{"calorias":number,"proteina":number,"carbohidratos":number},"comentario":"..."}\n` +
@@ -324,34 +379,28 @@ exports.countCalories = async (req, res) => {
       }
     }
 
-    if (imageUrl) {
-      const prompt = `Eres un nutricionista. Analiza esta comida desde la imagen y responde ÚNICAMENTE en JSON con el formato:\n` +
-        `{"items":[{"nombre":"...","calorias":number,"proteina":number,"carbohidratos":number}],"total":{"calorias":number,"proteina":number,"carbohidratos":number},"comentario":"..."}\n` +
-        `URL: ${imageUrl}`;
+if (imageUrl) {
+  // 🔥 1. Detectar comida con IA
+  const prompt = `Describe brevemente la comida en esta imagen (solo nombre del plato): ${imageUrl}`;
+  const ai = await requestCaloriesByAI(prompt);
 
-      const ai = await requestCaloriesByAI(prompt);
+  const detectedFood = ai.outputText;
 
-      if (!result.calories && ai.parsed) {
-        result.calories = ai.parsed;
-        result.source = "image_ai";
-      } else if (!result.calories) {
-        result.source = "image_ai";
-      }
+  // 🔥 2. Consultar Spoonacular con lo detectado
+  const spoon = await getNutritionFromSpoonacular(detectedFood);
 
-      result.details.imageUrl = imageUrl;
-      result.details.imageAiText = ai.outputText;
-      result.details.imageMacros = ai.macros;
-      result.details.imageAiJson = ai.aiJson;
+  if (spoon && spoon.calorias) {
+    result.calories = spoon.calorias;
+    result.proteina = spoon.proteina;
+    result.carbohidratos = spoon.carbohidratos;
+    result.source = "image_spoonacular";
+  } else {
+    result.source = "image_ai_fallback";
+  }
 
-      if (ai.aiJson?.total) {
-        result.calories = ai.aiJson.total.calorias || result.calories;
-        result.proteina = ai.aiJson.total.proteina || result.proteina;
-        result.carbohidratos = ai.aiJson.total.carbohidratos || result.carbohidratos;
-      } else {
-        if (!result.proteina && ai.macros?.proteina) result.proteina = ai.macros.proteina;
-        if (!result.carbohidratos && ai.macros?.carbohidratos) result.carbohidratos = ai.macros.carbohidratos;
-      }
-    }
+  result.details.detectedFood = detectedFood;
+  result.details.imageUrl = imageUrl;
+}
 
     // Si se tiene texto y no macros aún, intentar extraer del texto
     if (!result.proteina && text) {

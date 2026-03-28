@@ -35,8 +35,8 @@ exports.getPosts = (limit, offset, callback) => {
       p.created_at AS time,
       u.nombre,
       u.avatar,
-      COALESCE(COUNT(DISTINCT l.post_id), 0) AS likes,
-      COALESCE(COUNT(DISTINCT c.id), 0) AS commentsCount
+      COALESCE(COUNT(DISTINCT l.user_id), 0) AS likes,
+      COALESCE(COUNT(DISTINCT c.user_id), 0) AS commentsCount
     FROM posts p
     INNER JOIN usuarios u ON p.user_id = u.id
     LEFT JOIN likes l ON p.id = l.post_id
