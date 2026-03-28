@@ -167,6 +167,7 @@ io.on("connection", (socket) => {
 
       io.to(`post_${data.postId}`).emit("post_like_updated", {
         postId: data.postId,
+        likes: likesCount,
         likesCount,
         likedByCurrent: isLiked
       });
