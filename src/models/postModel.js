@@ -26,7 +26,6 @@ exports.getPosts = (limit, offset, callback) => {
   const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 10;
   const safeOffset = Number.isInteger(offset) && offset >= 0 ? offset : 0;
   
-  // ✅ Una sola query con aggregates
   const sql = `
     SELECT 
       p.id,
@@ -36,7 +35,7 @@ exports.getPosts = (limit, offset, callback) => {
       p.created_at AS time,
       u.nombre,
       u.avatar,
-      COALESCE(COUNT(DISTINCT l.post_id), 0) AS likes,
+      COALESCE(COUNT(DISTINCT l.id), 0) AS likes,
       COALESCE(COUNT(DISTINCT c.id), 0) AS commentsCount
     FROM posts p
     INNER JOIN usuarios u ON p.user_id = u.id
@@ -77,9 +76,9 @@ exports.getPostsWithUserLikeStatus = (limit, offset, authUserId, callback) => {
       p.created_at AS time,
       u.nombre,
       u.avatar,
-      COALESCE(COUNT(DISTINCT l.post_id), 0) AS likes,
+      COALESCE(COUNT(DISTINCT l.id), 0) AS likes,
       COALESCE(COUNT(DISTINCT c.id), 0) AS commentsCount,
-      CASE WHEN MAX(CASE WHEN ul.user_id IS NOT NULL THEN 1 ELSE 0 END) = 1 THEN 1 ELSE 0 END AS liked
+      IF(MAX(ul.user_id IS NOT NULL), 1, 0) AS liked
     FROM posts p
     INNER JOIN usuarios u ON p.user_id = u.id
     LEFT JOIN likes l ON p.id = l.post_id
@@ -129,7 +128,6 @@ exports.getPostById = (postId, callback) => {
     callback(null, rows?.[0] || null);
   });
 };
-
 exports.getPostByIdWithUser = (postId, authUserId, callback) => {
   const sql = `
     SELECT
@@ -142,7 +140,7 @@ exports.getPostByIdWithUser = (postId, authUserId, callback) => {
       u.avatar,
       COALESCE(COUNT(DISTINCT l.id), 0) AS likes,
       COALESCE(COUNT(DISTINCT c.id), 0) AS commentsCount,
-      CASE WHEN MAX(CASE WHEN ul.user_id IS NOT NULL THEN 1 ELSE 0 END) = 1 THEN 1 ELSE 0 END AS liked
+      IF(MAX(ul.user_id IS NOT NULL), 1, 0) AS liked
     FROM posts p
     INNER JOIN usuarios u ON p.user_id = u.id
     LEFT JOIN likes l ON p.id = l.post_id

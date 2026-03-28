@@ -41,11 +41,25 @@ exports.createPost = (req, res) => {
       // Obtener el post completo + datos de usuario para retorno inmediato
       postModel.getPostByIdWithUser(postId, user_id, (err2, newPost) => {
         if (err2) {
-          console.error("[PostController] getPostByIdWithUser error:", err2);
-          return res.status(500).json({ success: false, message: "Post creado, pero no se pudo recuperar" });
-        }
+  console.error("[PostController] getPostByIdWithUser error:", err2);
 
-        cache.clear(CACHE_PREFIX + 'page_1');
+  // ⚠️ IMPORTANTE: el post SÍ se creó
+  return res.json({
+    success: true,
+    message: "Post creado (sin datos completos)",
+    post: {
+      id: postId,
+      user_id,
+      image_url,
+      caption,
+      likes: 0,
+      commentsCount: 0,
+      liked: 0
+    }
+  });
+}
+
+        cache.clearByPrefix(CACHE_PREFIX);
 
         // Emitir evento de nueva publicación (para Socket.IO)
         process.emit('new_post', { post: newPost });
@@ -136,7 +150,7 @@ exports.toggleLike = (req, res) => {
       }
 
       // Invalidar cache al cambiar likes
-      cache.clear(CACHE_PREFIX + 'page_1');
+      cache.clearByPrefix(CACHE_PREFIX);
 
       likesModel.getLikesCount(postId, (err, likeCount) => {
         if (err) {
@@ -202,7 +216,7 @@ exports.addComment = (req, res) => {
       }
       
       // Invalidar cache al agregar comentario
-      cache.clear(CACHE_PREFIX + 'page_1');
+      cache.clearByPrefix(CACHE_PREFIX);
       
       return res.json({ success: true, comment: newComment });
     });
@@ -247,7 +261,7 @@ exports.deletePost = async (req, res) => {
       return res.status(404).json({ success: false, message: "Post no encontrado al eliminar" });
     }
 
-    cache.clear(CACHE_PREFIX + 'page_1');
+    cache.clearByPrefix(CACHE_PREFIX);
 
     // Emitir evento global para sockets
     process.emit('post_deleted', { postId });
