@@ -69,6 +69,31 @@ describe('Food Controller', () => {
       expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
     });
+
+    test('debe crear entradas desde aiJson (bulk)', async () => {
+      const bulkItems = [
+        { nombre: 'Ensalada', calorias: 150, proteina: 5, carbohidratos: 20 },
+        { nombre: 'Pollo', calorias: 220, proteina: 30, carbohidratos: 0 }
+      ];
+
+      db.query.mockImplementation((sql, values, callback) => {
+        callback(null, { affectedRows: 2, insertId: 1 });
+      });
+
+      const response = await request(app)
+        .post('/api/food/entries')
+        .send({ aiJson: { items: bulkItems, total: { calorias: 370, proteina: 35, carbohidratos: 20 } } });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.message).toContain('bulk');
+      expect(response.body.insertedCount).toBe(2);
+      expect(db.query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO food_entries'),
+        expect.any(Array),
+        expect.any(Function)
+      );
+    });
   });
 
   describe('GET /api/food/entries', () => {

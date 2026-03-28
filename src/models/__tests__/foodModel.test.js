@@ -55,6 +55,30 @@ describe('Food Model', () => {
     });
   });
 
+  describe('createFoodEntriesBulk', () => {
+    test('debe insertar múltiples entradas en bulk', (done) => {
+      const entries = [
+        { user_id: 1, descripcion: 'Ensalada', calorias: 150, proteina: 5, carbohidratos: 20, fecha: '2026-03-27', image_url: null },
+        { user_id: 1, descripcion: 'Pollo', calorias: 220, proteina: 30, carbohidratos: 0, fecha: '2026-03-27', image_url: null }
+      ];
+
+      db.query.mockImplementation((sql, values, callback) => {
+        callback(null, { affectedRows: 2, insertId: 1 });
+      });
+
+      foodModel.createFoodEntriesBulk(entries, (err, result) => {
+        expect(err).toBeNull();
+        expect(result.affectedRows).toBe(2);
+        expect(db.query).toHaveBeenCalledWith(
+          expect.stringContaining('INSERT INTO food_entries'),
+          expect.any(Array),
+          expect.any(Function)
+        );
+        done();
+      });
+    });
+  });
+
   describe('getFoodEntriesByUserAndDate', () => {
     test('debe obtener entradas por usuario y fecha', (done) => {
       const userId = 1;
