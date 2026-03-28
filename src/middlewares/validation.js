@@ -4,11 +4,10 @@ const Joi = require('joi');
 const createFoodEntrySchema = Joi.object({
   descripcion: Joi.string()
     .trim()
-    .min(1)
+    .empty('')
     .max(500)
     .optional()
     .messages({
-      'string.empty': 'La descripción no puede estar vacía',
       'string.max': 'La descripción no puede exceder 500 caracteres'
     }),
 
