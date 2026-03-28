@@ -165,10 +165,19 @@ io.on("connection", (socket) => {
       const likesCount = await getLikesCountPromise(data.postId);
       const isLiked = await isLikedByUserPromise(socket.data.userId, data.postId);
 
-      io.to(`post_${data.postId}`).emit("post_like_updated", {
+      // Emit to other users in the room (no likedByCurrent there)
+      socket.to(`post_${data.postId}`).emit("post_like_updated", {
         postId: data.postId,
         likesCount,
-        likedByCurrent: isLiked
+        toggledByUserId: socket.data.userId,
+      });
+
+      // Ack for the user who clicked like, with current liked status
+      socket.emit("post_like_updated", {
+        postId: data.postId,
+        likesCount,
+        likedByCurrent: isLiked,
+        toggledByUserId: socket.data.userId,
       });
     } catch (err) {
       console.error("❌ Error toggling like:", err);
