@@ -223,6 +223,15 @@ io.on("connection", (socket) => {
   });
 });
 
+// 🔥 Evento para nuevas publicaciones
+process.on('new_post', (data) => {
+  io.sockets.sockets.forEach(socket => {
+    if (socket.data.userId && socket.data.userId !== data.userId) {
+      socket.emit('new_post', { postId: data.postId });
+    }
+  });
+});
+
 // DB status endpoint
 app.get("/status", (req, res) => {
   db.query("SELECT 1 + 1 AS value", (err, results) => {

@@ -7,25 +7,25 @@ const pool = mysql.createPool({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   waitForConnections: true,
-  connectionLimit: 1, // 🔥 Más conservador
+  connectionLimit: 5, // ✅ Aumentado a 5 para mejor concurrencia
   queueLimit: 0,
   port: process.env.DB_PORT || 3306,
   connectTimeout: 10000,
+  enableKeepAlive: true,
+  keepAliveInitialDelayMs: 0,
 });
 
-// Nota: No intentamos levantamiento inmediato de conexión para evitar consumir
-// conexiones de más en entornos con límite estricto (max_user_connections).
-// Las consultas gestionarán automáticamente la conexión por pedido.
-
-pool.on('acquire', () => console.log('🔌 DB connection acquired (pool)'));
-pool.on('release', () => console.log('✅ DB connection released (pool)'));
-pool.on('enqueue', () => console.log('⏳ DB connection queueing (pool)'));
+// Event listeners para debugging (opcional, reducir en producción)
+pool.on('acquire', () => console.log('[DB] 🔌 Connection acquired'));
+pool.on('release', () => console.log('[DB] ✅ Connection released'));
+pool.on('enqueue', () => console.log('[DB] ⏳ Connection queued'));
+pool.on('error', (err) => console.error('[DB] ❌ Pool error:', err.message));
 
 const shutdown = () => {
-  console.log('🛑 cerrando pool DB...');
+  console.log('[DB] 🛑 Closing pool...');
   pool.end((err) => {
-    if (err) console.error('❌ Error cerrando pool DB:', err);
-    else console.log('✅ Pool DB cerrado');
+    if (err) console.error('[DB] ❌ Error closing pool:', err);
+    else console.log('[DB] ✅ Pool closed');
     process.exit(err ? 1 : 0);
   });
 };
@@ -33,6 +33,6 @@ const shutdown = () => {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-console.log("✅ DB pool configurado");
+console.log("[DB] ✅ Pool configured (limit: 5)");
 
 module.exports = pool;

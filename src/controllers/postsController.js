@@ -1,7 +1,15 @@
-const postModel = require("../models/postModel");
+﻿const postModel = require("../models/postModel");
 const likesModel = require("../models/likesModel");
 const commentsModel = require("../models/commentsModel");
+const cache = require("../utils/cache");
 
+//  Cache config
+const CACHE_TTL = 15000; // 15 segundos
+const CACHE_PREFIX = 'feed:';
+
+/**
+ * Crear un nuevo post
+ */
 exports.createPost = (req, res) => {
   try {
     const caption = req.body.caption;
@@ -23,114 +31,84 @@ exports.createPost = (req, res) => {
 
     postModel.createPost(user_id, image_url, caption, (err, result) => {
       if (err) {
-        console.error("Error en createPost:", err);
+        console.error("[PostController] createPost error:", err);
         return res.status(500).json({ success: false, message: "Error al crear post" });
       }
-      return res.json({ success: true, message: "Post creado" });
+      
+      const postId = result.insertId;
+      
+      //  Invalidar caché de feed al crear nuevo post
+      cache.clear(CACHE_PREFIX + 'page_1');
+      
+      // Emitir evento de nueva publicación (para Socket.IO)
+      process.emit('new_post', { postId, userId: user_id });
+      
+      return res.json({ success: true, message: "Post creado", postId });
     });
   } catch (error) {
-    console.error("Error en createPost:", error);
+    console.error("[PostController] createPost exception:", error);
     return res.status(500).json({ success: false, message: "Error al crear post" });
   }
 };
 
-const fetchPosts = (limit, offset) => {
-  return new Promise((resolve, reject) => {
-    postModel.getPosts(limit, offset, (err, posts) => {
-      if (err) return reject(err);
-      resolve(posts);
-    });
-  });
-};
-
-const fetchPostsWithRetry = async (limit, offset, maxAttempts = 2) => {
-  let attempt = 0;
-  while (attempt < maxAttempts) {
-    attempt++;
-    try {
-      const posts = await fetchPosts(limit, offset);
-      return posts;
-    } catch (error) {
-      console.warn(`Intento ${attempt} getPosts falló:`, error.message);
-      if (attempt >= maxAttempts) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 250));
-    }
-  }
-};
-
-exports.getPosts = async (req, res) => {
+/**
+ *  OPTIMIZADO: Obtener posts con caché + SQL agregado
+ * Antes: ~30 queries para 10 posts (1 main + 3 per post)
+ * Ahora: 1 query con aggregates + caché
+ * Resultado esperado: <500ms en first page, <10ms en cache hit
+ */
+exports.getPosts = (req, res) => {
   try {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
     const offset = (page - 1) * limit;
     const authUserId = req.user?.id || null;
 
-    let posts;
-    try {
-      posts = await fetchPostsWithRetry(limit, offset, 2);
-    } catch (err) {
-      console.error("getPosts total failed after retry:", err);
-      return res.status(500).json({ success: false, message: "Error obteniendo posts" });
+    // Intentar caché (solo para first page)
+    const cacheKey = CACHE_PREFIX + `page_${page}_limit_${limit}`;
+    if (page === 1) {
+      const cached = cache.get(cacheKey);
+      if (cached) {
+        console.log('[PostController]  Cache HIT for page 1 - 0ms query time');
+        return res.json({ success: true, posts: cached, page, limit, cached: true, queryTimeMs: 0 });
+      }
     }
 
-    const safePosts = Array.isArray(posts) ? posts : [];
+    // Inicio del timer de query
+    const queryStart = Date.now();
 
-    try {
-      const enriched = await Promise.all(safePosts.map(async (post) => {
-        try {
-          const likeCount = await new Promise((resolve, reject) => {
-            likesModel.getLikesCount(post.id, (likeErr, likeCountResult) => {
-              if (likeErr) return reject(likeErr);
-              resolve(likeCountResult || 0);
-            });
-          });
+    //  Una sola query en lugar de N+1
+    postModel.getPostsWithUserLikeStatus(limit, offset, authUserId, (err, posts) => {
+      if (err) {
+        console.error("[PostController] getPosts query error:", err);
+        return res.status(500).json({ success: false, message: "Error obteniendo posts" });
+      }
 
-          const commentCount = await new Promise((resolve, reject) => {
-            commentsModel.getCommentsCount(post.id, (commentErr, commentCountResult) => {
-              if (commentErr) return reject(commentErr);
-              resolve(commentCountResult || 0);
-            });
-          });
+      const queryTime = Date.now() - queryStart;
+      
+      // Guardar en caché si es first page
+      if (page === 1) {
+        cache.set(cacheKey, posts || [], CACHE_TTL);
+        console.log(`[PostController] Cached page 1 (${posts?.length || 0} posts, query=${queryTime}ms, ttl=${CACHE_TTL}ms)`);
+      }
 
-          let isLiked = false;
-          if (authUserId) {
-            isLiked = await new Promise((resolve, reject) => {
-              likesModel.isPostLikedByUser(authUserId, post.id, (likedErr, likedResult) => {
-                if (likedErr) return reject(likedErr);
-                resolve(Boolean(likedResult));
-              });
-            });
-          }
-
-          return {
-            ...post,
-            user_id: post.user_id,
-            likes: likeCount,
-            commentsCount: commentCount,
-            liked: isLiked,
-          };
-        } catch (itemErr) {
-          console.error(`Error enriching post ${post.id}:`, itemErr);
-          return {
-            ...post,
-            likes: 0,
-            commentsCount: 0,
-            liked: false,
-          };
-        }
-      }));
-
-      return res.json({ success: true, posts: enriched, page, limit });
-    } catch (enrichErr) {
-      console.error("Error enriching posts:", enrichErr);
-      return res.status(500).json({ success: false, message: "Error obteniendo posts" });
-    }
+      return res.json({ 
+        success: true, 
+        posts: posts || [], 
+        page, 
+        limit,
+        queryTimeMs: queryTime
+      });
+    });
   } catch (error) {
-    console.error("Error in getPosts:", error);
+    console.error("[PostController] getPosts exception:", error);
     return res.status(500).json({ success: false, message: "Error obteniendo posts" });
   }
 };
 
+/**
+ * Toggle like de un post (con invalidación de caché)
+ */
 exports.toggleLike = (req, res) => {
   try {
     const userId = req.user?.id;
@@ -145,13 +123,16 @@ exports.toggleLike = (req, res) => {
 
     likesModel.toggleLike(userId, postId, (err, likeResult) => {
       if (err) {
-        console.error("Error toggleLike:", err);
+        console.error("[PostController] toggleLike error:", err);
         return res.status(500).json({ success: false, message: "Error toggling like" });
       }
 
+      // Invalidar cache al cambiar likes
+      cache.clear(CACHE_PREFIX + 'page_1');
+
       likesModel.getLikesCount(postId, (err, likeCount) => {
         if (err) {
-          console.error("Error getLikesCount:", err);
+          console.error("[PostController] getLikesCount error:", err);
           return res.status(500).json({ success: false, message: "Error toggling like" });
         }
 
@@ -159,11 +140,14 @@ exports.toggleLike = (req, res) => {
       });
     });
   } catch (error) {
-    console.error("Error toggleLike:", error);
+    console.error("[PostController] toggleLike exception:", error);
     return res.status(500).json({ success: false, message: "Error toggling like" });
   }
 };
 
+/**
+ * Obtener comentarios de un post
+ */
 exports.getComments = (req, res) => {
   try {
     const postId = parseInt(req.params.id, 10);
@@ -173,17 +157,20 @@ exports.getComments = (req, res) => {
 
     commentsModel.getComments(postId, (err, comments) => {
       if (err) {
-        console.error("Error getComments:", err);
+        console.error("[PostController] getComments error:", err);
         return res.status(500).json({ success: false, message: "Error obteniendo comentarios" });
       }
       return res.json({ success: true, comments });
     });
   } catch (error) {
-    console.error("Error getComments:", error);
+    console.error("[PostController] getComments exception:", error);
     return res.status(500).json({ success: false, message: "Error obteniendo comentarios" });
   }
 };
 
+/**
+ * Agregar comentario (con invalidación de caché)
+ */
 exports.addComment = (req, res) => {
   try {
     const userId = req.user?.id;
@@ -202,17 +189,24 @@ exports.addComment = (req, res) => {
 
     commentsModel.addComment(userId, postId, comment, (err, newComment) => {
       if (err) {
-        console.error("Error addComment:", err);
+        console.error("[PostController] addComment error:", err);
         return res.status(500).json({ success: false, message: "Error creando comentario" });
       }
+      
+      // Invalidar cache al agregar comentario
+      cache.clear(CACHE_PREFIX + 'page_1');
+      
       return res.json({ success: true, comment: newComment });
     });
   } catch (error) {
-    console.error("Error addComment:", error);
+    console.error("[PostController] addComment exception:", error);
     return res.status(500).json({ success: false, message: "Error creando comentario" });
   }
 };
 
+/**
+ * Eliminar post (con invalidación de caché)
+ */
 exports.deletePost = (req, res) => {
   try {
     const userId = req.user?.id;
@@ -227,7 +221,7 @@ exports.deletePost = (req, res) => {
 
     postModel.getPostById(postId, (err, post) => {
       if (err) {
-        console.error("Error getPostById:", err);
+        console.error("[PostController] getPostById error:", err);
         return res.status(500).json({ success: false, message: "Error obteniendo post" });
       }
       if (!post) {
@@ -237,30 +231,47 @@ exports.deletePost = (req, res) => {
         return res.status(403).json({ success: false, message: "No autorizado para eliminar este post" });
       }
 
-      // Eliminar likes y comentarios asociados si no hay restricción de FK cascade
-      commentsModel.deleteCommentsByPostId?.(postId, (commErr) => {
-        if (commErr) {
-          console.error("Error deleting comments for post:", commErr);
-          // continuar de todos modos
-        }
+      // Eliminación en paralelo (3 operaciones)
+      let completed = 0;
+      let hasError = false;
 
-        likesModel.deleteLikesByPostId?.(postId, (likeErr) => {
-          if (likeErr) {
-            console.error("Error deleting likes for post:", likeErr);
-          }
-
+      const checkCompletion = () => {
+        completed++;
+        if (completed === 2 && !hasError) {
           postModel.deletePost(postId, (deleteErr) => {
             if (deleteErr) {
-              console.error("Error deletePost:", deleteErr);
+              console.error("[PostController] deletePost error:", deleteErr);
               return res.status(500).json({ success: false, message: "Error eliminando post" });
             }
+            
+            // Invalidar cache
+            cache.clear(CACHE_PREFIX + 'page_1');
+            
             return res.json({ success: true, message: "Post eliminado" });
           });
-        });
+        }
+      };
+
+      // Eliminar comentarios
+      commentsModel.deleteCommentsByPostId?.(postId, (commErr) => {
+        if (commErr) {
+          console.error("[PostController] Error deleting comments:", commErr);
+          hasError = true;
+        }
+        checkCompletion();
+      });
+
+      // Eliminar likes
+      likesModel.deleteLikesByPostId?.(postId, (likeErr) => {
+        if (likeErr) {
+          console.error("[PostController] Error deleting likes:", likeErr);
+          hasError = true;
+        }
+        checkCompletion();
       });
     });
   } catch (error) {
-    console.error("Error deletePost:", error);
+    console.error("[PostController] deletePost exception:", error);
     return res.status(500).json({ success: false, message: "Error eliminando post" });
   }
 };
