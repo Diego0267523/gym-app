@@ -7,12 +7,11 @@ const pool = mysql.createPool({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   waitForConnections: true,
-  connectionLimit: 5, // ✅ Aumentado a 5 para mejor concurrencia
+  connectionLimit: 2, // ✅ Reducido a 2 (Render limita a 5 totales)
   queueLimit: 0,
   port: process.env.DB_PORT || 3306,
   connectTimeout: 10000,
   enableKeepAlive: true,
-  keepAliveInitialDelayMs: 0,
 });
 
 // Event listeners para debugging (opcional, reducir en producción)
