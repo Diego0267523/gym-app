@@ -4,18 +4,16 @@ const authController = require("../controllers/authController");
 const notificationsController = require("../controllers/notificationsController");
 const verifyToken = require("../middlewares/authMiddleware");
 const upload = require("../middlewares/upload");
-const { authLimiter } = require("../middlewares/rateLimiter");
-const { loginSchema, registerSchema, validate } = require("../middlewares/validation");
 
 // ==========================
 // 🔐 AUTH
 // ==========================
 
 // REGISTRO
-router.post("/register", authLimiter, validate(registerSchema), authController.register);
+router.post("/register", authController.register);
 
 // LOGIN
-router.post("/login", authLimiter, validate(loginSchema), authController.login);
+router.post("/login", authController.login);
 
 // ==========================
 // 👤 PERFIL (NUEVO 🔥)
