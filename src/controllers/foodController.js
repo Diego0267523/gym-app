@@ -155,26 +155,31 @@ exports.getWeeklyTotals = (req, res) => {
       return res.status(401).json({ success: false, message: "Usuario no autenticado" });
     }
 
-    foodModel.getWeeklyTotals(user_id, (err, results) => {
+    // Generar los 7 días de la semana actual (lunes a domingo)
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0 = domingo, 1 = lunes
+    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - daysFromMonday);
+    
+    // Generar array de 7 fechas en formato YYYY-MM-DD
+    const weekDates = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      weekDates.push(d.toISOString().split('T')[0]);
+    }
+
+    foodModel.getWeeklyTotals(user_id, weekDates, (err, results) => {
       if (err) {
         logger.error("Error en getWeeklyTotals:", { error: err.message, user_id });
         return res.status(500).json({ success: false, message: "Error al obtener totales semanales" });
       }
 
-      // Generar los 7 días de la semana actual (lunes a domingo)
-      const today = new Date();
-      const dayOfWeek = today.getDay(); // 0 = domingo, 1 = lunes
-      
-      // Calcular el primer día (lunes) de la semana actual
-      const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Si es domingo, retroceder 6 días
-      const monday = new Date(today);
-      monday.setDate(today.getDate() - daysFromMonday);
-      
+      // Mapear resultados a los 7 días
       const week = [];
       for (let i = 0; i < 7; i++) {
-        const d = new Date(monday);
-        d.setDate(monday.getDate() + i);
-        const day = d.toISOString().split('T')[0];
+        const day = weekDates[i];
         const item = results.find(r => r.fecha === day);
         week.push({ fecha: day, total_calorias: item ? Number(item.total_calorias) : 0 });
       }

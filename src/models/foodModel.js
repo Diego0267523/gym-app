@@ -95,20 +95,20 @@ const getDailyTotals = (userId, fecha, callback) => {
     db.query(sql, [userId, fecha], callback);
 };
 
-// Obtener totales de calorías de la semana actual (lunes a domingo)
-const getWeeklyTotals = (userId, callback) => {
+// Obtener totales de calorías para 7 fechas específicas (lunes a domingo)
+const getWeeklyTotals = (userId, weekDates, callback) => {
+    const placeholders = weekDates.map(() => '?').join(',');
     const sql = `
         SELECT
-            CAST(fecha AS DATE) as fecha,
+            fecha,
             COALESCE(SUM(calorias), 0) AS total_calorias
         FROM food_entries
-        WHERE user_id = ? 
-          AND CAST(fecha AS DATE) >= CURDATE() - INTERVAL WEEKDAY(CURDATE()) DAY
-          AND CAST(fecha AS DATE) <= CURDATE() + INTERVAL (6 - WEEKDAY(CURDATE())) DAY
-        GROUP BY CAST(fecha AS DATE)
-        ORDER BY CAST(fecha AS DATE) ASC
+        WHERE user_id = ? AND fecha IN (${placeholders})
+        GROUP BY fecha
+        ORDER BY fecha ASC
     `;
-    db.query(sql, [userId], callback);
+    const values = [userId, ...weekDates];
+    db.query(sql, values, callback);
 };
 
 module.exports = {
