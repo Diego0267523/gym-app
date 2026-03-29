@@ -43,7 +43,7 @@ router.post("/ai/calories", verifyToken, upload.single("image"), async (req, res
     if (text) formData.append("text", text);
 
     const response = await axios.post(
-      "https://api.logmeal.com/imagen/segmentación/completa",
+      "https://api.logmeal.com/imagen/segmentacion/completa",
       formData,
       {
         headers: {
