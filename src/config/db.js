@@ -7,17 +7,21 @@ const pool = mysql.createPool({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   waitForConnections: true,
-  connectionLimit: 2, // ✅ Reducido a 2 (Render limita a 5 totales)
+  connectionLimit: 1, // ✅ Reducido a 1 para evitar exceder límites de Clever Cloud
   queueLimit: 0,
   port: process.env.DB_PORT || 3306,
   connectTimeout: 10000,
   enableKeepAlive: true,
+  keepAliveInitialDelay: 0,
 });
 
-// Event listeners para debugging (opcional, reducir en producción)
-pool.on('acquire', () => console.log('[DB] 🔌 Connection acquired'));
-pool.on('release', () => console.log('[DB] ✅ Connection released'));
-pool.on('enqueue', () => console.log('[DB] ⏳ Connection queued'));
+// Event listeners para debugging (solo en desarrollo)
+if (process.env.NODE_ENV !== 'production') {
+  pool.on('acquire', () => console.log('[DB] 🔌 Connection acquired'));
+  pool.on('release', () => console.log('[DB] ✅ Connection released'));
+  pool.on('enqueue', () => console.log('[DB] ⏳ Connection queued'));
+}
+
 pool.on('error', (err) => console.error('[DB] ❌ Pool error:', err.message));
 
 const shutdown = () => {
@@ -32,6 +36,6 @@ const shutdown = () => {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-console.log("[DB] ✅ Pool configured (limit: 5)");
+console.log("[DB] ✅ Pool configured (limit: 1)");
 
 module.exports = pool;

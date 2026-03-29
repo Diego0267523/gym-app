@@ -20,14 +20,14 @@ const initDatabase = () => {
 
   console.log(`📋 Encontrados ${statements.length} statements CREATE TABLE`);
 
-  // Ejecutar cada statement de manera secuencial para evitar sobrecargar conexiones
-  let completed = 0;
-  const total = statements.length;
+  // Crear array de tareas incluyendo la verificación de avatar
+  const tasks = [
+    ...statements.map(stmt => ({ type: 'create_table', sql: stmt + ';' })),
+    { type: 'check_avatar' }
+  ];
 
-  if (statements.length === 0) {
-    console.log("❌ No se encontraron statements CREATE TABLE válidos");
-    return;
-  }
+  let completed = 0;
+  const total = tasks.length;
 
   const executeNext = () => {
     if (completed >= total) {
@@ -35,51 +35,54 @@ const initDatabase = () => {
       return;
     }
 
-    const statement = statements[completed];
-    const fullStatement = statement + ';'; // Agregar el punto y coma que se perdió en el split
+    const task = tasks[completed];
 
-    db.query(fullStatement, (err, result) => {
-      if (err) {
-        console.error(`❌ Error en tabla ${completed + 1}:`, err.message);
-        console.error(`SQL: ${fullStatement.substring(0, 100)}...`);
-      } else {
-        console.log(`✅ Tabla ${completed + 1}/${total} creada/verificada`);
-      }
+    if (task.type === 'create_table') {
+      db.query(task.sql, (err, result) => {
+        if (err) {
+          console.error(`❌ Error en tabla ${completed + 1}:`, err.message);
+        } else {
+          console.log(`✅ Tabla ${completed + 1}/${total} creada/verificada`);
+        }
+        completed++;
+        setTimeout(executeNext, 200); // Delay reducido
+      });
+    } else if (task.type === 'check_avatar') {
+      const checkAvatarSQL = `
+        SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_NAME='usuarios' AND COLUMN_NAME='avatar' AND TABLE_SCHEMA=DATABASE()
+      `;
 
-      completed++;
-      // Ejecutar el siguiente statement después de un delay mayor
-      setTimeout(executeNext, 500);
-    });
+      db.query(checkAvatarSQL, (err, results) => {
+        if (err) {
+          console.error("❌ Error verificando columna avatar:", err.message);
+          completed++;
+          setTimeout(executeNext, 200);
+          return;
+        }
+
+        if (results.length === 0) {
+          const alterSQL = `ALTER TABLE usuarios ADD COLUMN avatar VARCHAR(500) DEFAULT NULL`;
+          db.query(alterSQL, (err2, result2) => {
+            if (err2) {
+              console.error("❌ Error agregando columna avatar:", err2);
+            } else {
+              console.log("✅ Columna avatar agregada");
+            }
+            completed++;
+            setTimeout(executeNext, 200);
+          });
+        } else {
+          console.log("✅ Columna avatar ya existe");
+          completed++;
+          setTimeout(executeNext, 200);
+        }
+      });
+    }
   };
 
   // Iniciar la ejecución secuencial
   executeNext();
-
-  // Verificar columna avatar
-  const checkAvatarSQL = `
-    SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_NAME='usuarios' AND COLUMN_NAME='avatar' AND TABLE_SCHEMA=DATABASE()
-  `;
-
-  db.query(checkAvatarSQL, (err, results) => {
-    if (err) {
-      console.error("❌ Error verificando columna avatar:", err);
-      return;
-    }
-
-    if (results.length === 0) {
-      const alterSQL = `ALTER TABLE usuarios ADD COLUMN avatar VARCHAR(500) DEFAULT NULL`;
-      db.query(alterSQL, (err2, result2) => {
-        if (err2) {
-          console.error("❌ Error agregando columna avatar:", err2);
-        } else {
-          console.log("✅ Columna avatar agregada");
-        }
-      });
-    } else {
-      console.log("✅ Columna avatar ya existe");
-    }
-  });
 };
 
 module.exports = initDatabase;
