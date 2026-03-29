@@ -108,57 +108,86 @@ router.post("/ai/calories", uploadMemory.single("image"), async (req, res) => {
       );
 
       const nutritionData = nutritionResponse.data;
-      console.log("✅ Información nutricional obtenida:", JSON.stringify(nutritionData, null, 2));
+      console.log("✅ Información nutricional obtenida");
 
-      // 🔥 Extraer información del primer segmento
-      const firstSegment = segmentationData.segmentation_results?.[0];
-      const firstRecognition = firstSegment?.recognition_results?.[0];
+      // 🔥 Procesar múltiples alimentos detectados
+      const segmentationResults = segmentationData.segmentation_results || [];
+      const nutritionalInfoPerItem = nutritionData.nutritional_info_per_item || [];
 
-      const foodName = firstRecognition?.name || nutritionData.foodName || "Alimento desconocido";
-      const confidence = firstRecognition?.prob || 0;
-      const servingSize = firstSegment?.serving_size || 0;
+      console.log(`📊 Detectados ${segmentationResults.length} alimentos en la imagen`);
 
-      // 🔥 Usar datos nutricionales reales de LogMeal si están disponibles
-      let nutrition;
-      if (nutritionData.hasNutritionalInfo && nutritionData.nutritional_info) {
-        // Información nutricional real de LogMeal
-        const nutriInfo = nutritionData.nutritional_info;
-        nutrition = {
-          calories: Math.round(nutriInfo.calories || 0),
-          proteina: Math.round(nutriInfo.protein?.value || 0),
-          carbohidratos: Math.round(nutriInfo.carbs?.value || 0),
-          grasas: Math.round(nutriInfo.fat?.value || 0),
-          fibra: Math.round(nutriInfo.fiber?.value || 0),
-          sodio: Math.round(nutriInfo.sodium?.value || 0)
-        };
-        console.log("✅ Usando datos nutricionales REALES de LogMeal");
-      } else {
-        // Fallback a estimaciones si no hay nutrición disponible
-        nutrition = {
-          calories: Math.round(servingSize * 1.5),
-          proteina: Math.round(servingSize * 0.25),
-          carbohidratos: Math.round(servingSize * 0.3),
-          grasas: Math.round(servingSize * 0.2),
-          fibra: 0,
-          sodio: 0
-        };
-        console.log("⚠️ Usando estimaciones nutricionales (LogMeal no proporcionó datos)");
+      // 🔥 Crear lista de alimentos con su información nutricional
+      const detectedFoods = [];
+
+      for (let i = 0; i < segmentationResults.length; i++) {
+        const segment = segmentationResults[i];
+        const recognition = segment.recognition_results?.[0]; // Tomar el más probable
+
+        if (!recognition) continue;
+
+        // 🔥 Buscar información nutricional específica para este segmento
+        const nutritionForItem = nutritionalInfoPerItem.find(
+          item => item.food_item_position === segment.food_item_position
+        );
+
+        let nutrition;
+        if (nutritionForItem && nutritionForItem.hasNutritionalInfo) {
+          // Información nutricional específica del segmento
+          const nutriInfo = nutritionForItem.nutritional_info || {};
+          nutrition = {
+            calories: Math.round(nutriInfo.calories || 0),
+            proteina: Math.round(nutriInfo.protein?.value || 0),
+            carbohidratos: Math.round(nutriInfo.carbs?.value || 0),
+            grasas: Math.round(nutriInfo.fat?.value || 0),
+            fibra: Math.round(nutriInfo.fiber?.value || 0),
+            sodio: Math.round(nutriInfo.sodium?.value || 0)
+          };
+        } else {
+          // Fallback a estimaciones basadas en el tamaño de porción
+          const servingSize = segment.serving_size || 0;
+          nutrition = {
+            calories: Math.round(servingSize * 1.5),
+            proteina: Math.round(servingSize * 0.25),
+            carbohidratos: Math.round(servingSize * 0.3),
+            grasas: Math.round(servingSize * 0.2),
+            fibra: 0,
+            sodio: 0
+          };
+        }
+
+        detectedFoods.push({
+          name: recognition.name,
+          confidence: recognition.prob || 0,
+          serving_size: segment.serving_size || 0,
+          nutrition: nutrition,
+          position: segment.food_item_position
+        });
       }
+
+      // 🔥 Calcular totales nutricionales combinados
+      const totalNutrition = detectedFoods.reduce((total, food) => {
+        return {
+          calories: total.calories + food.nutrition.calories,
+          proteina: total.proteina + food.nutrition.proteina,
+          carbohidratos: total.carbohidratos + food.nutrition.carbohidratos,
+          grasas: total.grasas + food.nutrition.grasas,
+          fibra: total.fibra + food.nutrition.fibra,
+          sodio: total.sodio + food.nutrition.sodio
+        };
+      }, { calories: 0, proteina: 0, carbohidratos: 0, grasas: 0, fibra: 0, sodio: 0 });
 
       return res.json({
         success: true,
-        food: {
-          name: foodName,
-          confidence: confidence,
-          serving_size: servingSize
-        },
-        nutrition: nutrition,
+        detected_foods: detectedFoods,
+        total_nutrition: totalNutrition,
+        summary: detectedFoods.map(food => `${food.name}: ${food.nutrition.calories} cal`).join(', '),
         details: {
+          total_foods: detectedFoods.length,
           logmeal_segmentation: segmentationData,
           logmeal_nutrition: nutritionData,
-          note: nutritionData.hasNutritionalInfo
-            ? "Datos nutricionales reales obtenidos de LogMeal"
-            : "Datos nutricionales estimados (LogMeal no tiene información completa)"
+          note: nutritionalInfoPerItem.length > 0
+            ? "Información nutricional detallada por alimento obtenida de LogMeal"
+            : "Información nutricional estimada (LogMeal no proporcionó datos detallados por alimento)"
         }
       });
     } else {
