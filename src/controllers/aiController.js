@@ -4,15 +4,71 @@
 
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
+const FormData = require("form-data");
+const fs = require("fs");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 
 const SPOON_API_KEY = process.env.SPOONACULAR_API_KEY;
+const LOGMEAL_API_KEY = process.env.LOGMEAL_API_KEY;
 
 // 🔥 CACHE SIMPLE EN MEMORIA
 const nutritionCache = new Map();
 
+async function analyzeImageWithLogMeal(imagePathOrUrl) {
+  try {
+    const form = new FormData();
 
+    // Si viene local (subido) se manda como archivo
+    if (fs.existsSync(imagePathOrUrl)) {
+      form.append("image", fs.createReadStream(imagePathOrUrl));
+    } else {
+      // Si es URL pública
+      form.append("image", imagePathOrUrl);
+    }
+
+    const response = await axios.post(
+      "https://api.logmeal.com/v2/image/segmentation/complete",
+      form,
+      {
+        headers: {
+          Authorization: `Bearer ${LOGMEAL_API_KEY}`,
+          ...form.getHeaders(),
+        },
+      }
+    );
+
+    const data = response.data;
+
+    if (!data.dishes || data.dishes.length === 0) {
+      return null;
+    }
+
+    // Aquí intentamos sacar nutrición si la API lo trae
+    const nutritions = data.dishes.map((dish) => ({
+      nombre: dish.name,
+      calorias: dish.nutrition?.calories ?? null,
+      proteina: dish.nutrition?.protein ?? null,
+      carbohidratos: dish.nutrition?.carbs ?? null,
+      grasas: dish.nutrition?.fat ?? null,
+    }));
+
+    // Sumatoria total
+    const total = nutritions.reduce(
+      (acc, item) => ({
+        calorias: acc.calorias + (item.calorias || 0),
+        proteina: acc.proteina + (item.proteina || 0),
+        carbohidratos: acc.carbohidratos + (item.carbohidratos || 0),
+      }),
+      { calorias: 0, proteina: 0, carbohidratos: 0 }
+    );
+
+    return { items: nutritions, total };
+  } catch (err) {
+    console.error("Error LogMeal analizar imagen:", err.response?.data || err);
+    return null;
+  }
+}
 
 // 🔥 Función para leer resultado de Gemini de forma segura
 const safeText = (result) => {
@@ -27,79 +83,38 @@ const safeText = (result) => {
     return "Hubo un problema con la IA 😢 intenta de nuevo.";
   }
 };
+ 
+async function analyzeImageWithSpoonacular(imageUrl) {
+  const API_KEY = process.env.SPOONACULAR_API_KEY;
 
-const getNutritionFromText = async (text) => {
-  try {
-    const response = await axios.post(
-      `https://api.spoonacular.com/recipes/parseIngredients?apiKey=${SPOON_API_KEY}`,
-      text,
-      {
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
-        }
+  const response = await axios.get(
+    `https://api.spoonacular.com/food/images/analyze`,
+    {
+      params: {
+        imageUrl,
+        apiKey: API_KEY
       }
-    );
-
-    const ingredients = response.data;
-
-    let total = {
-      calorias: 0,
-      proteina: 0,
-      carbohidratos: 0
-    };
-
-    for (const item of ingredients) {
-      const id = item.id;
-
-      const info = await axios.get(
-        `https://api.spoonacular.com/food/ingredients/${id}/information`,
-        {
-          params: {
-            amount: item.amount,
-            unit: item.unit,
-            apiKey: SPOON_API_KEY
-          }
-        }
-      );
-
-      const nutrients = info.data.nutrition.nutrients;
-
-      total.calorias += nutrients.find(n => n.name === "Calories")?.amount || 0;
-      total.proteina += nutrients.find(n => n.name === "Protein")?.amount || 0;
-      total.carbohidratos += nutrients.find(n => n.name === "Carbohydrates")?.amount || 0;
     }
+  );
 
-    return total;
-  } catch (error) {
-    console.log("❌ Spoonacular text error:", error.response?.data || error.message);
-    return null;
-  }
-};
+  const data = response.data;
 
-const getNutritionFromImage = async (imageUrl) => {
-  try {
-    const response = await axios.get(
-      "https://api.spoonacular.com/food/images/analyze",
-      {
-        params: {
-          imageUrl,
-          apiKey: SPOON_API_KEY
-        }
-      }
-    );
+  return {
+    calorias: data.nutrition?.calories?.value || 0,
+    proteina: data.nutrition?.protein?.value || 0,
+    carbohidratos: data.nutrition?.carbs?.value || 0,
 
-    const data = response.data;
+    // 🔥 lo que detecta
+    items: data.category
+      ? [{
+          nombre: data.category.name,
+          cantidad: 1,
+          unidad: "porcion"
+        }]
+      : []
+  };
+}
 
-    return {
-      calorias: data.nutrition?.nutrients?.find(n => n.name === "Calories")?.amount || null,
-      proteina: data.nutrition?.nutrients?.find(n => n.name === "Protein")?.amount || null,
-      carbohidratos: data.nutrition?.nutrients?.find(n => n.name === "Carbohydrates")?.amount || null
-    };
-  } catch (error) {
-    console.log("❌ Spoonacular image error:", error.response?.data || error.message);
-    return null;
-  }
-};
 
 // 🔥 Detección de tipo de pregunta
 const classifyQuestion = (pregunta) => {
@@ -362,138 +377,63 @@ const requestCaloriesByAI = async (promptMessage) => {
 
   return { outputText, parsed, macros, aiJson, items };
 };
-const getNutritionFromSpoonacular = async (query) => {
-  try {
-    const response = await axios.get(
-      "https://api.spoonacular.com/recipes/complexSearch",
-      {
-        params: {
-          query,
-          addRecipeNutrition: true,
-          number: 1,
-          apiKey: SPOON_API_KEY
-        }
-      }
-    );
 
-    const recipe = response.data.results[0];
-
-    if (!recipe || !recipe.nutrition) return null;
-
-    const nutrients = recipe.nutrition.nutrients;
-
-    return {
-      calorias: nutrients.find(n => n.name === "Calories")?.amount || null,
-      proteina: nutrients.find(n => n.name === "Protein")?.amount || null,
-      carbohidratos: nutrients.find(n => n.name === "Carbohydrates")?.amount || null
-    };
-  } catch (error) {
-    console.log("❌ Spoonacular error:", error.response?.data || error.message);
-    return null;
-  }
-};
 // Nuevo endpoint: conteo de calorías por texto / imagen
 exports.countCalories = async (req, res) => {
   try {
-    const { text } = req.body;
     let imageUrl = req.body.imageUrl;
+    const text = req.body.text;
 
-    console.log("[countCalories] req.file:", req.file);
-
+    // Si sube una imagen en archivo (ej: multer, cloudinary, etc.)
     if (req.file) {
-      imageUrl = req.file.secure_url || req.file.path || req.file.url;
+      imageUrl = req.file.path || req.file.url || req.file.secure_url;
     }
 
+    // Si no hay texto ni imagen -> error
     if (!text && !imageUrl) {
-      return res.status(400).json({ success: false, message: "Debes enviar text o imageUrl (o subir image)" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Debes enviar text o imageUrl" });
     }
 
-    let result = { success: true, calories: null, proteina: null, carbohidratos: null, source: null, details: {} };
+    // 1️⃣ Si viene imagen, analizar con LogMeal
+    if (imageUrl) {
+      const logmealRes = await analyzeImageWithLogMeal(imageUrl);
 
-if (text) {
-  // 🔥 1. Intentar Spoonacular primero (DATOS REALES)
-  const spoon = await getNutritionFromSpoonacular(text);
-
-  if (spoon && spoon.calorias) {
-    return res.json({
-      success: true,
-      calories: spoon.calorias,
-      proteina: spoon.proteina,
-      carbohidratos: spoon.carbohidratos,
-      source: "spoonacular"
-    });
-  }
-
-  // 🔥 2. Si Spoon falla → usar regex
-  const parsed = cleanCaloriesText(text);
-  if (parsed !== null) {
-    result = { ...result, calories: parsed, source: "text_regex", details: { text } };
-    return res.json(result);
-  }
-
-  // 🔥 3. Último recurso → IA
-
-      const prompt = `Eres un nutricionista. Dada la siguiente descripción de comida, responde ÚNICAMENTE con JSON válido (nada más) en este formato:\n` +
-        `{"items":[{"nombre":"...","calorias":number,"proteina":number,"carbohidratos":number}],"total":{"calorias":number,"proteina":number,"carbohidratos":number},"comentario":"..."}\n` +
-        `Si no estás seguro, deja valor como null. Evita explicaciones adicionales. \nDescripción: ${text}`;
-
-      const ai = await requestCaloriesByAI(prompt);
-      result = {
-        ...result,
-        calories: ai.parsed || null,
-        proteina: ai.macros?.proteina || null,
-        carbohidratos: ai.macros?.carbohidratos || null,
-        source: "text_ai",
-        details: { text, aiText: ai.outputText, aiJson: ai.aiJson }
-      };
-
-      if (ai.aiJson?.total) {
-        result.calories = ai.aiJson.total.calorias || result.calories;
-        result.proteina = ai.aiJson.total.proteina || result.proteina;
-        result.carbohidratos = ai.aiJson.total.carbohidratos || result.carbohidratos;
+      if (!logmealRes) {
+        return res
+          .status(500)
+          .json({ success: false, message: "No se pudo analizar la imagen" });
       }
+
+      return res.json({
+        success: true,
+        calories: logmealRes.total.calorias,
+        proteina: logmealRes.total.proteina,
+        carbohidratos: logmealRes.total.carbohidratos,
+        items: logmealRes.items,
+        source: "logmeal_image",
+      });
     }
-  
-if (imageUrl) {
-  const prompt = `Describe brevemente la comida en esta imagen (solo nombre del plato): ${imageUrl}`;
-  const ai = await requestCaloriesByAI(prompt);
 
-  const detectedFood = ai.outputText;
+    // 2️⃣ Si viene texto, aquí podemos devolverlo tal cual
+    if (text) {
+      return res.json({
+        success: true,
+        message:
+          "Texto recibido pero la API actual sólo soporta análisis de imagen",
+        text,
+      });
+    }
 
-  const spoon = await getNutritionFromSpoonacular(detectedFood);
-
-  if (spoon && spoon.calorias) {
-    return res.json({
-      success: true,
-      calories: spoon.calorias,
-      proteina: spoon.proteina,
-      carbohidratos: spoon.carbohidratos,
-      source: "image_spoonacular",
-      details: {
-        detectedFood,
-        imageUrl
-      }
+  } catch (error) {
+    console.log("🔥 ERROR countCalories:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error calculando calorías",
+      error: error.message,
     });
   }
-
-  result.source = "image_ai_fallback";
-  result.details.detectedFood = detectedFood;
-  result.details.imageUrl = imageUrl;
-}
-// 🔥 fallback final
-if (!result.calories) {
-  result.note = "No se pudo calcular con precisión";
-}
-
-return res.json(result);
-
-} catch (error) {
-  console.log("🔥 ERROR IA CALORIAS:", error);
-  return res.status(500).json({
-    message: "Error calculando calorías",
-    error: error.message
-  });
-}
 };
 
 // 🔥 Controlador para generar rutinas (opcional)
