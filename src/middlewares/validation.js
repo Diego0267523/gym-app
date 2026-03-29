@@ -38,6 +38,33 @@ const createFoodEntrySchema = Joi.object({
       'number.max': 'Los carbohidratos no pueden exceder 1,000g'
     }),
 
+  grasas: Joi.number()
+    .min(0)
+    .max(1000)
+    .optional()
+    .messages({
+      'number.min': 'Las grasas deben ser un número positivo',
+      'number.max': 'Las grasas no pueden exceder 1,000g'
+    }),
+
+  fibra: Joi.number()
+    .min(0)
+    .max(500)
+    .optional()
+    .messages({
+      'number.min': 'La fibra debe ser un número positivo',
+      'number.max': 'La fibra no puede exceder 500g'
+    }),
+
+  sodio: Joi.number()
+    .min(0)
+    .max(10000)
+    .optional()
+    .messages({
+      'number.min': 'El sodio debe ser un número positivo',
+      'number.max': 'El sodio no puede exceder 10,000mg'
+    }),
+
   fecha: Joi.string()
     .pattern(/^\d{4}-\d{2}-\d{2}$/)
     .optional()
@@ -51,13 +78,19 @@ const createFoodEntrySchema = Joi.object({
           nombre: Joi.string().trim().max(200).required(),
           calorias: Joi.number().min(0).max(10000).required(),
           proteina: Joi.number().min(0).max(1000).required(),
-          carbohidratos: Joi.number().min(0).max(1000).required()
+          carbohidratos: Joi.number().min(0).max(1000).required(),
+          grasas: Joi.number().min(0).max(1000).optional(),
+          fibra: Joi.number().min(0).max(500).optional(),
+          sodio: Joi.number().min(0).max(10000).optional()
         }).unknown(true) // permite campos adicionales en items
       ).required(),
       total: Joi.object({
         calorias: Joi.number().min(0).max(10000).required(),
         proteina: Joi.number().min(0).max(1000).required(),
-        carbohidratos: Joi.number().min(0).max(1000).required()
+        carbohidratos: Joi.number().min(0).max(1000).required(),
+        grasas: Joi.number().min(0).max(1000).optional(),
+        fibra: Joi.number().min(0).max(500).optional(),
+        sodio: Joi.number().min(0).max(10000).optional()
       }).optional()
     }).unknown(true), // permite campos adicionales como 'comentario'
     Joi.string() // permite recibir json como string en multipart/form-data

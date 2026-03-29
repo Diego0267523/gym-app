@@ -7,8 +7,8 @@ const db = require("../config/db");
 // Crear entrada de comida
 const createFoodEntry = (entry, callback) => {
     const sql = `
-        INSERT INTO food_entries (user_id, fecha, descripcion, calorias, proteina, carbohidratos, image_url)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO food_entries (user_id, fecha, descripcion, calorias, proteina, carbohidratos, grasas, fibra, sodio, image_url)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const values = [
         entry.user_id,
@@ -17,6 +17,9 @@ const createFoodEntry = (entry, callback) => {
         entry.calorias || 0,
         entry.proteina || 0,
         entry.carbohidratos || 0,
+        entry.grasas || 0,
+        entry.fibra || 0,
+        entry.sodio || 0,
         entry.image_url
     ];
     db.query(sql, values, callback);
@@ -28,7 +31,7 @@ const createFoodEntriesBulk = (entries, callback) => {
         return callback(null, { affectedRows: 0, insertId: null });
     }
 
-    const placeholders = entries.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ');
+    const placeholders = entries.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
     const values = [];
 
     entries.forEach(entry => {
@@ -39,12 +42,15 @@ const createFoodEntriesBulk = (entries, callback) => {
         entry.calorias || 0,
         entry.proteina || 0,
         entry.carbohidratos || 0,
+        entry.grasas || 0,
+        entry.fibra || 0,
+        entry.sodio || 0,
         entry.image_url || null
       );
     });
 
     const sql = `
-        INSERT INTO food_entries (user_id, fecha, descripcion, calorias, proteina, carbohidratos, image_url)
+        INSERT INTO food_entries (user_id, fecha, descripcion, calorias, proteina, carbohidratos, grasas, fibra, sodio, image_url)
         VALUES ${placeholders}
     `;
 
@@ -54,7 +60,7 @@ const createFoodEntriesBulk = (entries, callback) => {
 // Obtener entradas de comida por usuario y fecha (día específico)
 const getFoodEntriesByUserAndDate = (userId, fecha, callback) => {
     const sql = `
-        SELECT id, descripcion, calorias, proteina, carbohidratos, image_url, created_at
+        SELECT id, descripcion, calorias, proteina, carbohidratos, grasas, fibra, sodio, image_url, created_at
         FROM food_entries
         WHERE user_id = ? AND fecha = ?
         ORDER BY created_at DESC
@@ -65,7 +71,7 @@ const getFoodEntriesByUserAndDate = (userId, fecha, callback) => {
 // Obtener todas las entradas de comida de un usuario (últimos 30 días)
 const getFoodEntriesByUser = (userId, callback) => {
     const sql = `
-        SELECT id, fecha, descripcion, calorias, proteina, carbohidratos, image_url, created_at
+        SELECT id, fecha, descripcion, calorias, proteina, carbohidratos, grasas, fibra, sodio, image_url, created_at
         FROM food_entries
         WHERE user_id = ? AND fecha >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
         ORDER BY fecha DESC, created_at DESC
@@ -88,7 +94,10 @@ const getDailyTotals = (userId, fecha, callback) => {
         SELECT
             SUM(calorias) AS total_calorias,
             SUM(proteina) AS total_proteina,
-            SUM(carbohidratos) AS total_carbohidratos
+            SUM(carbohidratos) AS total_carbohidratos,
+            SUM(grasas) AS total_grasas,
+            SUM(fibra) AS total_fibra,
+            SUM(sodio) AS total_sodio
         FROM food_entries
         WHERE user_id = ? AND fecha = ?
     `;
@@ -98,9 +107,14 @@ const getDailyTotals = (userId, fecha, callback) => {
 // Obtener totales de calorías de la semana actual (con timezone local)
 const getWeeklyTotals = (userId, callback) => {
     const sql = `
-        SELECT 
+        SELECT
             DATE(CONVERT_TZ(created_at, '+00:00', '-05:00')) AS fecha_local,
-            COALESCE(SUM(calorias), 0) AS total_calorias
+            COALESCE(SUM(calorias), 0) AS total_calorias,
+            COALESCE(SUM(proteina), 0) AS total_proteina,
+            COALESCE(SUM(carbohidratos), 0) AS total_carbohidratos,
+            COALESCE(SUM(grasas), 0) AS total_grasas,
+            COALESCE(SUM(fibra), 0) AS total_fibra,
+            COALESCE(SUM(sodio), 0) AS total_sodio
         FROM food_entries
         WHERE user_id = ?
         AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY)

@@ -22,7 +22,7 @@ exports.createFoodEntry = (req, res) => {
       return res.status(400).json({ success: false, message: "Datos inválidos", errors });
     }
 
-    const { descripcion, calorias, proteina, carbohidratos, fecha } = req.body;
+    const { descripcion, calorias, proteina, carbohidratos, grasas, fibra, sodio, fecha } = req.body;
     let { aiJson } = req.body;
     const image_url = req.file ? (req.file.secure_url || req.file.path || req.file.url) : null;
 
@@ -37,9 +37,12 @@ exports.createFoodEntry = (req, res) => {
         calorias: Number(item.calorias || 0),
         proteina: Number(item.proteina || 0),
         carbohidratos: Number(item.carbohidratos || 0),
+        grasas: Number(item.grasas || 0),
+        fibra: Number(item.fibra || 0),
+        sodio: Number(item.sodio || 0),
         fecha: fecha || new Date().toISOString().split('T')[0],
         image_url
-      })).filter(e => e.calorias > 0 || e.proteina > 0 || e.carbohidratos > 0 || e.descripcion);
+      })).filter(e => e.calorias > 0 || e.proteina > 0 || e.carbohidratos > 0 || e.grasas > 0 || e.fibra > 0 || e.sodio > 0 || e.descripcion);
 
       if (entries.length === 0) return res.status(400).json({ success: false, message: "No hay valores nutricionales válidos en aiJson" });
 
@@ -59,6 +62,9 @@ exports.createFoodEntry = (req, res) => {
       calorias: parseFloat(calorias) || 0,
       proteina: parseFloat(proteina) || 0,
       carbohidratos: parseFloat(carbohidratos) || 0,
+      grasas: parseFloat(grasas) || 0,
+      fibra: parseFloat(fibra) || 0,
+      sodio: parseFloat(sodio) || 0,
       fecha: fecha || new Date().toISOString().split('T')[0],
       image_url
     };
