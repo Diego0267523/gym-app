@@ -46,13 +46,17 @@ cron.schedule('0 * * * *', async () => {
 
 const app = express();
 
+// 🔥 CONFIGURACIÓN PARA PROXY (necesario para express-rate-limit en producción)
+app.set('trust proxy', 1); // Confía en el primer proxy (ej: Heroku, Render, etc.)
+
 const allowedOrigins = [
   process.env.FRONTEND_URL || "http://localhost:3000",
   "https://gym-frontend-s8up.onrender.com",
   "http://localhost:3001",
   "http://localhost:3000"
 ];
-
+// Debe ir antes de cualquier middleware que use express-rate-limit
+app.set('trust proxy', 1); // confía en 1 proxy (Render / Vercel)
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {

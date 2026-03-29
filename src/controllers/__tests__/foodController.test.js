@@ -1,6 +1,6 @@
 const request = require('supertest');
 const express = require('express');
-const foodRoutes = require('../../routes/foodRoutes');
+const foodController = require('../foodController');
 const db = require('../../config/db');
 
 // Mock de DB
@@ -8,20 +8,40 @@ jest.mock('../../config/db', () => ({
   query: jest.fn()
 }));
 
-// Mock de auth middleware
-jest.mock('../../middlewares/authMiddleware', () => (req, res, next) => {
-  req.user = { id: 1 }; // Mock user
-  next();
-});
+// Mock de axios para LogMeal y Gemini
+const axios = require('axios');
+jest.mock('axios', () => ({
+  post: jest.fn(),
+  get: jest.fn()
+}));
 
-// Mock de upload middleware
-jest.mock('../../middlewares/upload', () => ({
-  single: () => (req, res, next) => next()
+// Mock de GoogleGenerativeAI
+jest.mock('@google/generative-ai', () => ({
+  GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
+    getGenerativeModel: jest.fn().mockReturnValue({
+      generateContent: jest.fn().mockResolvedValue({
+        response: {
+          text: () => '{"total":{"calorias":200,"proteina":10,"carbohidratos":30},"items":[{"nombre":"Pollo","calorias":200,"proteina":10,"carbohidratos":30}]}'
+        }
+      })
+    })
+  }))
 }));
 
 const app = express();
 app.use(express.json());
-app.use('/api/food', foodRoutes);
+
+// Middleware para simular usuario autenticado
+app.use((req, res, next) => {
+  req.user = { id: 1 }; // Simular usuario con ID 1
+  next();
+});
+
+// Routes
+app.post('/api/food/entries', foodController.createFoodEntry);
+app.get('/api/food/entries', foodController.getFoodEntries);
+app.get('/api/food/totals', foodController.getDailyTotals);
+app.delete('/api/food/entries/:id', foodController.deleteFoodEntry);
 
 describe('Food Controller', () => {
   beforeEach(() => {
