@@ -134,13 +134,15 @@ router.post("/ai/calories", uploadMemory.single("image"), async (req, res) => {
         if (nutritionForItem && nutritionForItem.hasNutritionalInfo) {
           // Información nutricional específica del segmento
           const nutriInfo = nutritionForItem.nutritional_info || {};
+          const totalNutrients = nutriInfo.totalNutrients || {};
+          
           nutrition = {
             calories: Math.round(nutriInfo.calories || 0),
-            proteina: Math.round(nutriInfo.protein?.value || 0),
-            carbohidratos: Math.round(nutriInfo.carbs?.value || 0),
-            grasas: Math.round(nutriInfo.fat?.value || 0),
-            fibra: Math.round(nutriInfo.fiber?.value || 0),
-            sodio: Math.round(nutriInfo.sodium?.value || 0)
+            proteina: Math.round(totalNutrients.PROCNT?.quantity || 0),
+            carbohidratos: Math.round(totalNutrients.CHOCDF?.quantity || 0),
+            grasas: Math.round(totalNutrients.FAT?.quantity || 0),
+            fibra: Math.round(totalNutrients.FIBTG?.quantity || 0),
+            sodio: Math.round(totalNutrients.NA?.quantity || 0)
           };
         } else {
           // Fallback a estimaciones basadas en el tamaño de porción
