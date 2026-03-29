@@ -480,7 +480,21 @@ if (imageUrl) {
   result.details.detectedFood = detectedFood;
   result.details.imageUrl = imageUrl;
 }
+// 🔥 fallback final
+if (!result.calories) {
+  result.note = "No se pudo calcular con precisión";
+}
 
+return res.json(result);
+
+} catch (error) {
+  console.log("🔥 ERROR IA CALORIAS:", error);
+  return res.status(500).json({
+    message: "Error calculando calorías",
+    error: error.message
+  });
+}
+};
 
 // 🔥 Controlador para generar rutinas (opcional)
 exports.generateRoutine = async (req, res) => {
