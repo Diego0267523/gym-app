@@ -453,6 +453,7 @@ if (text) {
         result.carbohidratos = ai.aiJson.total.carbohidratos || result.carbohidratos;
       }
     }
+  
 if (imageUrl) {
   const prompt = `Describe brevemente la comida en esta imagen (solo nombre del plato): ${imageUrl}`;
   const ai = await requestCaloriesByAI(prompt);
@@ -479,6 +480,7 @@ if (imageUrl) {
   result.details.detectedFood = detectedFood;
   result.details.imageUrl = imageUrl;
 }
+
 
 // 🔥 Controlador para generar rutinas (opcional)
 exports.generateRoutine = async (req, res) => {
@@ -511,4 +513,5 @@ Responde de manera corta, clara y aplicable.
       error: error.message
     });
   }
+
 };

@@ -12,7 +12,7 @@ const createFoodEntry = (entry, callback) => {
     `;
     const values = [
         entry.user_id,
-        entry.fecha || new Date().toISOString().split('T')[0], // Fecha en formato YYYY-MM-DD
+        entry.fecha || new Date(),  // 🔥 Cambio: Guardar como DATETIME (UTC), no como string DATE
         entry.descripcion,
         entry.calorias || 0,
         entry.proteina || 0,
@@ -95,20 +95,19 @@ const getDailyTotals = (userId, fecha, callback) => {
     db.query(sql, [userId, fecha], callback);
 };
 
-// Obtener totales de calorías para 7 fechas específicas (lunes a domingo)
-const getWeeklyTotals = (userId, weekDates, callback) => {
-    const placeholders = weekDates.map(() => '?').join(',');
+// Obtener totales de calorías de la semana actual (con timezone local)
+const getWeeklyTotals = (userId, callback) => {
     const sql = `
-        SELECT
-            fecha,
+        SELECT 
+            DATE(CONVERT_TZ(created_at, '+00:00', '-05:00')) AS fecha_local,
             COALESCE(SUM(calorias), 0) AS total_calorias
         FROM food_entries
-        WHERE user_id = ? AND fecha IN (${placeholders})
-        GROUP BY fecha
-        ORDER BY fecha ASC
+        WHERE user_id = ?
+        AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY)
+        GROUP BY fecha_local
+        ORDER BY fecha_local ASC
     `;
-    const values = [userId, ...weekDates];
-    db.query(sql, values, callback);
+    db.query(sql, [userId], callback);
 };
 
 module.exports = {

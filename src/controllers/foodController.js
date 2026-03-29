@@ -155,33 +155,31 @@ exports.getWeeklyTotals = (req, res) => {
       return res.status(401).json({ success: false, message: "Usuario no autenticado" });
     }
 
-    // Generar los 7 días de la semana actual (lunes a domingo)
-    const today = new Date();
-    const dayOfWeek = today.getDay(); // 0 = domingo, 1 = lunes
-    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    const monday = new Date(today);
-    monday.setDate(today.getDate() - daysFromMonday);
-    
-    // Generar array de 7 fechas en formato YYYY-MM-DD
-    const weekDates = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + i);
-      weekDates.push(d.toISOString().split('T')[0]);
-    }
-
-    foodModel.getWeeklyTotals(user_id, weekDates, (err, results) => {
+    foodModel.getWeeklyTotals(user_id, (err, results) => {
       if (err) {
         logger.error("Error en getWeeklyTotals:", { error: err.message, user_id });
         return res.status(500).json({ success: false, message: "Error al obtener totales semanales" });
       }
 
-      // Mapear resultados a los 7 días
+      // 🔥 Generar últimos 7 días en LOCAL (Colombia - UTC-5)
       const week = [];
-      for (let i = 0; i < 7; i++) {
-        const day = weekDates[i];
-        const item = results.find(r => r.fecha === day);
-        week.push({ fecha: day, total_calorias: item ? Number(item.total_calorias) : 0 });
+      const today = new Date();
+
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(today.getDate() - i);
+
+        // Convertir a fecha local (Colombia UTC-5)
+        const localDate = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+          .toISOString()
+          .split('T')[0];
+
+        const found = results.find(r => r.fecha_local === localDate);
+
+        week.push({
+          fecha: localDate,
+          total_calorias: found ? Number(found.total_calorias) : 0
+        });
       }
 
       logger.info("Totales semanales obtenidos", { user_id, week });
