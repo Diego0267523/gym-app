@@ -17,6 +17,6 @@ router.post("/routine", verifyToken, aiLimiter, generateRoutine);
 router.post("/chat", verifyToken, aiLimiter, chatAssistant);
 
 // Conteo de calorías por texto / imagen (upload optional)
-router.post("/calories", verifyToken, aiLimiter, upload.single("image"), countCalories);
+router.post("/calories", verifyToken, aiLimiter, upload.uploadMemory.single("image"), countCalories);
 
 module.exports = router;

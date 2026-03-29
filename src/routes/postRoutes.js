@@ -7,7 +7,7 @@ const upload = require("../middlewares/upload");
 const postsController = require("../controllers/postsController");
 
 // 🔥 crear post (protegido)
-router.post("/", verifyToken, upload.single("image"), postsController.createPost);
+router.post("/", verifyToken, upload.uploadCloudinary.single("image"), postsController.createPost);
 
 // 🔥 obtener feed (autenticación opcional - permite ver likes si está autenticado)
 router.get("/", verifyTokenOptional, postsController.getPosts);

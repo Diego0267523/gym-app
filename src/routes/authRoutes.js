@@ -27,7 +27,7 @@ router.put("/change-password", verifyToken, authController.changePassword);
 router.get("/profile", profileLimiter, verifyToken, authController.getProfile);
 
 // 📸 Actualizar avatar
-router.put("/profile/avatar", verifyToken, upload.single("avatar"), authController.updateAvatar);
+router.put("/profile/avatar", verifyToken, upload.uploadCloudinary.single("avatar"), authController.updateAvatar);
 
 // ==========================
 // 🔔 NOTIFICACIONES

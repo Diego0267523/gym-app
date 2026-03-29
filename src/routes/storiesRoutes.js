@@ -6,7 +6,7 @@ const upload = require("../middlewares/upload");
 const storiesController = require("../controllers/storiesController");
 
 // 🔥 crear historia (protegido)
-router.post("/", verifyToken, upload.single("image"), storiesController.createStory);
+router.post("/", verifyToken, upload.uploadCloudinary.single("image"), storiesController.createStory);
 
 // 🔥 obtener todas las historias (máximo 24 horas)
 router.get("/", storiesController.getStories);
