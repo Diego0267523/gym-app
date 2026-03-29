@@ -6,6 +6,7 @@ const upload = require("../middlewares/upload");
 const { createFoodEntrySchema, validate } = require("../middlewares/validation");
 const axios = require("axios");
 const FormData = require("form-data");
+
 // ==========================
 // 🍽️ FOOD ENTRIES
 // ==========================
@@ -25,8 +26,10 @@ router.get("/weekly-totals", verifyToken, foodController.getWeeklyTotals);
 // Eliminar entrada de comida
 router.delete("/entries/:id", verifyToken, foodController.deleteFoodEntry);
 
-module.exports = router;
-exports.analyzeFood = async (req, res) => {
+// ==========================
+// 🍴 ANALIZAR IMAGEN / TEXTO CON LOGMEAL
+// ==========================
+router.post("/ai/calories", verifyToken, upload.single("image"), async (req, res) => {
   try {
     const text = req.body.text || "";
     const imageFile = req.file?.buffer;
@@ -45,7 +48,7 @@ exports.analyzeFood = async (req, res) => {
       {
         headers: {
           ...formData.getHeaders(),
-          Authorization: `Bearer ${process.env.LOGMEAL_API_KEY}`,
+          Authorization: `Bearer ${process.env.LOGMEAL_API_KEY}`, // <-- tu API key aquí
         },
       }
     );
@@ -72,4 +75,6 @@ exports.analyzeFood = async (req, res) => {
       error: error.response?.data || error.message,
     });
   }
-};
+});
+
+module.exports = router;
